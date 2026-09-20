@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import platform
-from dataclasses import dataclass
 
 from .models import CPUInfo
 
@@ -117,7 +116,7 @@ def _detect_with_platform() -> CPUInfo:
 def _get_cpu_model_linux() -> str:
     """Read CPU model from /proc/cpuinfo on Linux."""
     try:
-        with open("/proc/cpuinfo", "r") as f:
+        with open("/proc/cpuinfo") as f:
             for line in f:
                 if line.startswith("model name"):
                     return line.split(":", 1)[1].strip()

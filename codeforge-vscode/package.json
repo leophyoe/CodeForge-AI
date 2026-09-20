@@ -1,0 +1,184 @@
+{
+  "name": "codeforge-ai",
+  "displayName": "CodeForge AI",
+  "description": "Local-first AI coding assistant powered by CodeForge",
+  "version": "0.1.0",
+  "publisher": "codeforge-ai",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "AI",
+    "Linters"
+  ],
+  "keywords": [
+    "ai",
+    "code",
+    "assistant",
+    "local",
+    "pytorch",
+    "inference"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "l10n": "./l10n",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeforge.openChat",
+        "title": "CodeForge: Open Chat"
+      },
+      {
+        "command": "codeforge.explain",
+        "title": "CodeForge: Explain Code"
+      },
+      {
+        "command": "codeforge.generate",
+        "title": "CodeForge: Generate Code"
+      },
+      {
+        "command": "codeforge.fix",
+        "title": "CodeForge: Fix Code"
+      },
+      {
+        "command": "codeforge.refactor",
+        "title": "CodeForge: Refactor Code"
+      },
+      {
+        "command": "codeforge.generateTests",
+        "title": "CodeForge: Generate Tests"
+      },
+      {
+        "command": "codeforge.selectModel",
+        "title": "CodeForge: Select Model"
+      },
+      {
+        "command": "codeforge.checkConnection",
+        "title": "CodeForge: Check Connection"
+      },
+      {
+        "command": "codeforge.serverInfo",
+        "title": "CodeForge: Server Information"
+      },
+      {
+        "command": "codeforge.setApiKey",
+        "title": "CodeForge: Set API Key"
+      },
+      {
+        "command": "codeforge.clearApiKey",
+        "title": "CodeForge: Clear API Key"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codeforge.explain",
+          "when": "editorHasSelection",
+          "group": "codeforge"
+        },
+        {
+          "command": "codeforge.fix",
+          "when": "editorHasSelection",
+          "group": "codeforge"
+        },
+        {
+          "command": "codeforge.refactor",
+          "when": "editorHasSelection",
+          "group": "codeforge"
+        },
+        {
+          "command": "codeforge.generateTests",
+          "when": "editorHasSelection",
+          "group": "codeforge"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeForge AI",
+      "properties": {
+        "codeforge.server.url": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "URL of the CodeForge API server"
+        },
+        "codeforge.model": {
+          "type": "string",
+          "default": "",
+          "description": "Selected model ID for generation"
+        },
+        "codeforge.requestTimeout": {
+          "type": "number",
+          "default": 60,
+          "description": "Request timeout in seconds"
+        },
+        "codeforge.enableInlineCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline code completion"
+        },
+        "codeforge.enableChat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable chat interface"
+        },
+        "codeforge.enableCodeActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable code actions (Explain, Fix, Refactor)"
+        },
+        "codeforge.enableTelemetry": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable anonymous telemetry (no code collected)"
+        },
+        "codeforge.completion.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Debounce delay for inline completion in milliseconds"
+        },
+        "codeforge.completion.maxPrefixChars": {
+          "type": "number",
+          "default": 2000,
+          "description": "Maximum prefix characters to send for completion"
+        },
+        "codeforge.completion.maxSuffixChars": {
+          "type": "number",
+          "default": 500,
+          "description": "Maximum suffix characters to send for completion"
+        },
+        "codeforge.completion.maxTokens": {
+          "type": "number",
+          "default": 256,
+          "description": "Maximum tokens for inline completion"
+        },
+        "codeforge.chat.maxContextChars": {
+          "type": "number",
+          "default": 8000,
+          "description": "Maximum characters for chat context"
+        },
+        "codeforge.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging to output channel"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.99.0",
+    "@vscode/vsce": "^3.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {}
+}

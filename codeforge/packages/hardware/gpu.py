@@ -13,8 +13,6 @@ from __future__ import annotations
 import platform
 import re
 import subprocess
-from dataclasses import dataclass
-from typing import Optional
 
 from .models import GPUInfo
 
@@ -59,7 +57,7 @@ def detect_gpu() -> GPUInfo:
     return GPUInfo()
 
 
-def _detect_nvidia_pynvml() -> Optional[GPUInfo]:
+def _detect_nvidia_pynvml() -> GPUInfo | None:
     """Detect NVIDIA GPU using nvidia-ml-py (pynvml)."""
     try:
         import pynvml
@@ -134,7 +132,7 @@ def _detect_nvidia_pynvml() -> Optional[GPUInfo]:
         return None
 
 
-def _detect_nvidia_torch() -> Optional[GPUInfo]:
+def _detect_nvidia_torch() -> GPUInfo | None:
     """Detect NVIDIA GPU via PyTorch CUDA."""
     try:
         import torch
@@ -151,7 +149,6 @@ def _detect_nvidia_torch() -> Optional[GPUInfo]:
         vram_free = free_mem / (1024**3)
 
         cuda_version = torch.version.cuda
-        driver_version = torch.version.cuda  # Approximate
 
         return GPUInfo(
             name=name,
@@ -168,7 +165,7 @@ def _detect_nvidia_torch() -> Optional[GPUInfo]:
         return None
 
 
-def _detect_amd_rocm() -> Optional[GPUInfo]:
+def _detect_amd_rocm() -> GPUInfo | None:
     """Detect AMD GPU using rocminfo."""
     try:
         result = subprocess.run(
@@ -190,7 +187,7 @@ def _detect_amd_rocm() -> Optional[GPUInfo]:
         vram_match = re.search(
             r"Memory Size:\s+([\d.]+)\s*(GB|MB|TB)", output, re.IGNORECASE
         )
-        vram_gb: Optional[float] = None
+        vram_gb: float | None = None
         if vram_match:
             size = float(vram_match.group(1))
             unit = vram_match.group(2).upper()
@@ -219,7 +216,7 @@ def _detect_amd_rocm() -> Optional[GPUInfo]:
         return None
 
 
-def _detect_apple_mps() -> Optional[GPUInfo]:
+def _detect_apple_mps() -> GPUInfo | None:
     """Detect Apple Silicon GPU via PyTorch MPS."""
     try:
         import torch
@@ -256,7 +253,7 @@ def _check_torch_cuda() -> bool:
         return False
 
 
-def _get_torch_cuda_version() -> Optional[str]:
+def _get_torch_cuda_version() -> str | None:
     """Get CUDA version from PyTorch."""
     try:
         import torch

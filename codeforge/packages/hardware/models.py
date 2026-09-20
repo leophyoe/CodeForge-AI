@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -15,11 +14,11 @@ class CPUInfo:
     cores_logical: int = 0
     threads: int = 0
     architecture: str = "Unknown"
-    max_frequency_mhz: Optional[float] = None
-    min_frequency_mhz: Optional[float] = None
-    current_frequency_mhz: Optional[float] = None
-    l2_cache_kb: Optional[int] = None
-    l3_cache_kb: Optional[int] = None
+    max_frequency_mhz: float | None = None
+    min_frequency_mhz: float | None = None
+    current_frequency_mhz: float | None = None
+    l2_cache_kb: int | None = None
+    l3_cache_kb: int | None = None
     flags: list[str] = field(default_factory=list)
 
 
@@ -37,17 +36,17 @@ class RAMInfo:
 class GPUInfo:
     """GPU information."""
 
-    name: Optional[str] = None
-    vendor: Optional[str] = None
-    vram_gb: Optional[float] = None
-    vram_free_gb: Optional[float] = None
-    driver_version: Optional[str] = None
-    cuda_version: Optional[str] = None
+    name: str | None = None
+    vendor: str | None = None
+    vram_gb: float | None = None
+    vram_free_gb: float | None = None
+    driver_version: str | None = None
+    cuda_version: str | None = None
     cuda_available: bool = False
     rocm_available: bool = False
     mps_available: bool = False
-    temperature: Optional[float] = None
-    utilization: Optional[float] = None
+    temperature: float | None = None
+    utilization: float | None = None
 
 
 @dataclass(frozen=True)
@@ -65,10 +64,10 @@ class PyTorchInfo:
     """PyTorch environment information."""
 
     installed: bool = False
-    version: Optional[str] = None
-    cuda_version: Optional[str] = None
-    cudnn_version: Optional[str] = None
-    hip_version: Optional[str] = None
+    version: str | None = None
+    cuda_version: str | None = None
+    cudnn_version: str | None = None
+    hip_version: str | None = None
     mps_available: bool = False
 
 
@@ -115,15 +114,15 @@ class HardwareInfo:
         return self.ram.available_gb
 
     @property
-    def gpu_name(self) -> Optional[str]:
+    def gpu_name(self) -> str | None:
         return self.gpu.name
 
     @property
-    def gpu_vendor(self) -> Optional[str]:
+    def gpu_vendor(self) -> str | None:
         return self.gpu.vendor
 
     @property
-    def vram_gb(self) -> Optional[float]:
+    def vram_gb(self) -> float | None:
         return self.gpu.vram_gb
 
     @property
@@ -139,11 +138,11 @@ class HardwareInfo:
         return self.gpu.mps_available
 
     @property
-    def pytorch_version(self) -> Optional[str]:
+    def pytorch_version(self) -> str | None:
         return self.pytorch.version
 
     @property
-    def pytorch_cuda_version(self) -> Optional[str]:
+    def pytorch_cuda_version(self) -> str | None:
         return self.pytorch.cuda_version
 
     @property

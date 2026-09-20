@@ -34,15 +34,14 @@ def detect_ram() -> RAMInfo:
 def _detect_ram_fallback() -> RAMInfo:
     """Fallback RAM detection using platform-specific methods."""
     import platform
-    import struct
 
     system = platform.system()
 
     if system == "Linux":
         return _detect_ram_linux()
-    elif system == "Windows":
+    if system == "Windows":
         return _detect_ram_windows()
-    elif system == "Darwin":
+    if system == "Darwin":
         return _detect_ram_macos()
 
     return RAMInfo()
@@ -52,7 +51,7 @@ def _detect_ram_linux() -> RAMInfo:
     """Read RAM info from /proc/meminfo on Linux."""
     try:
         meminfo: dict[str, int] = {}
-        with open("/proc/meminfo", "r") as f:
+        with open("/proc/meminfo") as f:
             for line in f:
                 parts = line.split(":")
                 if len(parts) == 2:
@@ -93,7 +92,7 @@ def _detect_ram_windows() -> RAMInfo:
     try:
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         c_ulonglong = ctypes.c_ulonglong
 
         class MEMORYSTATUSEX(ctypes.Structure):

@@ -35,11 +35,14 @@ class TestCLI:
     def test_search_not_implemented(self) -> None:
         runner = CliRunner()
         result = runner.invoke(main, ["search", "test"])
-        assert result.exit_code == 0
-        assert "not yet implemented" in result.output
+        assert result.exit_code != 0
 
-    def test_chat_not_implemented(self) -> None:
+    def test_chat_requires_model(self) -> None:
         runner = CliRunner()
-        result = runner.invoke(main, ["chat", "hello"])
-        assert result.exit_code == 0
-        assert "not yet implemented" in result.output
+        result = runner.invoke(main, ["chat"])
+        assert result.exit_code != 0
+
+    def test_generate_requires_model(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["generate", "hello"])
+        assert result.exit_code != 0

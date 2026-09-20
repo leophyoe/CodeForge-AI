@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 from .cpu import detect_cpu
 from .disk import detect_disk
@@ -43,7 +42,7 @@ class HardwareManager:
                 Set to 0 to disable caching.
         """
         self._cache_ttl = cache_ttl_seconds
-        self._cached_info: Optional[HardwareInfo] = None
+        self._cached_info: HardwareInfo | None = None
         self._cache_timestamp: float = 0.0
 
     def detect(self, force: bool = False) -> HardwareInfo:

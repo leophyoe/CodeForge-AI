@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .models import PyTorchInfo
 
 
@@ -17,8 +15,8 @@ def detect_pytorch() -> PyTorchInfo:
         import torch
 
         version = torch.__version__
-        cuda_version: Optional[str] = None
-        cudnn_version: Optional[str] = None
+        cuda_version: str | None = None
+        cudnn_version: str | None = None
 
         if torch.cuda.is_available():
             cuda_version = torch.version.cuda
@@ -26,7 +24,7 @@ def detect_pytorch() -> PyTorchInfo:
         if hasattr(torch.backends, "cudnn") and torch.backends.cudnn.is_available():
             cudnn_version = str(torch.backends.cudnn.version())
 
-        hip_version: Optional[str] = None
+        hip_version: str | None = None
         if hasattr(torch.version, "hip") and torch.version.hip is not None:
             hip_version = torch.version.hip
 

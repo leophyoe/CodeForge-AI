@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-import time
 from unittest.mock import patch
 
 from codeforge.packages.hardware.manager import HardwareManager
 from codeforge.packages.hardware.models import (
     CPUInfo,
-    DiskInfo,
-    GPUInfo,
     HardwareInfo,
-    PyTorchInfo,
-    RAMInfo,
 )
 
 
@@ -110,9 +105,7 @@ class TestHardwareManager:
 
     @patch("codeforge.packages.hardware.manager.detect_cpu")
     def test_detect_with_mocked_cpu(self, mock_cpu: object) -> None:
-        from unittest.mock import MagicMock
-
-        mock_cpu.return_value = CPUInfo(
+        mock_cpu.return_value = CPUInfo(  # type: ignore[union-attr]
             model="Mocked CPU",
             cores_physical=4,
             cores_logical=8,

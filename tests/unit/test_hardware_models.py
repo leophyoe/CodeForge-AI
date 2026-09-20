@@ -43,7 +43,7 @@ class TestCPUInfo:
         info = CPUInfo(model="Test")
         try:
             info.model = "Changed"  # type: ignore[misc]
-            assert False, "Should be frozen"
+            raise AssertionError("Should be frozen")
         except AttributeError:
             pass
 
