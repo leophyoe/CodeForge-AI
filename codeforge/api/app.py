@@ -91,6 +91,8 @@ def _register_routers(app: FastAPI) -> None:
         models,
         openai_compat,
         runtime,
+        search,
+        workspaces,
     )
 
     app.include_router(health.router, prefix="/v1")
@@ -100,3 +102,5 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(generation.router, prefix="/v1")
     app.include_router(embeddings.router, prefix="/v1")
     app.include_router(openai_compat.router, prefix="/v1")
+    app.include_router(search.router, prefix="/v1")
+    app.include_router(workspaces.router)

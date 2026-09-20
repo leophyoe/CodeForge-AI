@@ -32,10 +32,10 @@ class TestCLI:
         assert result.exit_code == 0
         assert "Diagnostics" in result.output
 
-    def test_search_not_implemented(self) -> None:
+    def test_search_command(self) -> None:
         runner = CliRunner()
         result = runner.invoke(main, ["search", "test"])
-        assert result.exit_code != 0
+        assert result.exit_code == 0
 
     def test_chat_requires_model(self) -> None:
         runner = CliRunner()

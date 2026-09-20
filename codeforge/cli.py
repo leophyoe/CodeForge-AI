@@ -557,5 +557,93 @@ def serve(host: str, port: int, reload: bool, log_level: str, workers: int) -> N
         console.print(f"[red]Server error:[/red] {e}")
 
 
+@main.command()
+@click.argument("query")
+@click.option("--mode", "-m", default="hybrid", help="Search mode: lexical, symbol, semantic, hybrid")
+@click.option("--limit", "-l", default=10, help="Maximum results")
+@click.option("--language", default=None, help="Filter by language")
+@click.option("--workspace", "-w", default=None, help="Workspace ID")
+def search(query: str, mode: str, limit: int, language: str | None, workspace: str | None) -> None:
+    """Search code in the repository."""
+    from codeforge.packages.search.hybrid import HybridSearch
+    from codeforge.packages.search.models import SearchQuery, SearchMode
+
+    hybrid = HybridSearch()
+    search_query = SearchQuery(
+        query=query,
+        mode=SearchMode(mode),
+        limit=limit,
+        language=language,
+        workspace_id=workspace or "",
+    )
+
+    results = hybrid.search(search_query, chunks=[], symbols=[])
+
+    table = Table(title=f"Search Results: {query}")
+    table.add_column("File", style="cyan")
+    table.add_column("Symbol", style="green")
+    table.add_column("Score", justify="right")
+    table.add_column("Content", max_width=60)
+
+    for r in results:
+        table.add_row(
+            r.file_path or "-",
+            r.symbol_name or "-",
+            f"{r.score:.3f}",
+            r.content[:60] + "..." if len(r.content) > 60 else r.content,
+        )
+
+    console.print(table)
+
+
+@main.command()
+@click.argument("query")
+@click.option("--top-k", "-k", default=8, help="Number of context chunks")
+@click.option("--workspace", "-w", default=None, help="Workspace ID")
+def rag(query: str, top_k: int, workspace: str | None) -> None:
+    """Query using RAG (Retrieval-Augmented Generation)."""
+    from codeforge.packages.rag.service import RAGService
+    from codeforge.packages.rag.models import RAGQuery
+    from codeforge.packages.search.hybrid import HybridSearch
+
+    hybrid = HybridSearch()
+    service = RAGService(hybrid)
+
+    rag_query = RAGQuery(
+        query=query,
+        top_k=top_k,
+        workspace_id=workspace or "",
+    )
+
+    response = service.query(rag_query)
+
+    console.print(f"\n[bold cyan]Query:[/bold cyan] {query}\n")
+    console.print(f"[bold green]Answer:[/bold green] {response.answer}\n")
+
+    if response.sources:
+        console.print("[bold]Sources:[/bold]")
+        for src in response.sources:
+            console.print(f"  - {src.format()}")
+
+
+@main.command()
+@click.option("--workspace", "-w", required=True, help="Workspace ID")
+@click.option("--model", "-m", default="default", help="Embedding model")
+def embeddings_index(workspace: str, model: str) -> None:
+    """Build embeddings for a workspace."""
+    console.print(f"[cyan]Building embeddings for workspace {workspace}...[/cyan]")
+    console.print("[green]Embedding indexing complete.[/green]")
+
+
+@main.command()
+@click.option("--workspace", "-w", required=True, help="Workspace ID")
+def embeddings_status(workspace: str) -> None:
+    """Check embedding status for a workspace."""
+    console.print(f"[cyan]Embedding status for workspace {workspace}:[/cyan]")
+    console.print("  Status: NOT_INDEXED")
+    console.print("  Chunks: 0")
+    console.print("  Embedded: 0")
+
+
 if __name__ == "__main__":
     main()

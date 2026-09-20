@@ -306,13 +306,42 @@ class TestGenerationEndpoint:
 
 
 class TestEmbeddingsEndpoint:
-    def test_embeddings_returns_501(self) -> None:
+    def test_embeddings_returns_embedding(self) -> None:
         client = TestClient(_make_app(), raise_server_exceptions=False)
         response = client.post(
             "/v1/embeddings",
-            json={"input": "hello", "model": "test"},
+            json={"text": "hello", "model": "test"},
         )
-        assert response.status_code == 501
+        assert response.status_code == 200
+        data = response.json()
+        assert "embedding" in data
+        assert "dimension" in data
+
+    def test_embeddings_batch(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post(
+            "/v1/embeddings/batch",
+            json={"texts": ["hello", "world"], "model": "test"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "embeddings" in data
+        assert data["count"] == 2
+
+    def test_embeddings_health(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.get("/v1/embeddings/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+
+    def test_embeddings_config(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.get("/v1/embeddings/config")
+        assert response.status_code == 200
+        data = response.json()
+        assert "provider" in data
+        assert "dimension" in data
 
 
 # ── OpenAI Compatible Endpoints ──────────────────────────────────────────
