@@ -1,0 +1,1 @@
+"""CodeForge AI applications package."""
