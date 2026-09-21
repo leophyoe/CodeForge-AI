@@ -7,7 +7,7 @@ Local-first, privacy-first AI coding assistant.
 ```bash
 # Create environment
 conda env create -f environment.yml
-conda activate codeforge
+conda activate codeforge-ai
 
 # Install in development mode
 pip install -e ".[dev]"
@@ -19,7 +19,7 @@ codeforge hardware
 codeforge doctor
 
 # Start API server
-uvicorn codeforge.apps.server.app:app --port 8420
+codeforge serve
 ```
 
 ## Architecture
@@ -42,29 +42,29 @@ Engine    Runtime
 
 ## Development Phases
 
+### Completed
+
 - [x] Phase 1: Hardware Detection
-- [ ] Phase 2: Python / PyTorch Environment
-- [ ] Phase 3: Runtime Abstraction
-- [ ] Phase 4: Model Loading
-- [ ] Phase 5: Text Generation
-- [ ] Phase 6: Streaming
-- [ ] Phase 7: FastAPI Server
-- [ ] Phase 8: VS Code Connection
-- [ ] Phase 9: Chat
-- [ ] Phase 10: Inline Completion
-- [ ] Phase 11: Repository Indexing
-- [ ] Phase 12: Hybrid Search
-- [ ] Phase 13: RAG
-- [ ] Phase 14: Tool System
-- [ ] Phase 15: Safe Terminal
-- [ ] Phase 16: File Editing and Diff
-- [ ] Phase 17: Testing Loop
-- [ ] Phase 18: Git Integration
-- [ ] Phase 19: Agent Engine
-- [ ] Phase 20: Memory
-- [ ] Phase 21: Security Hardening
-- [ ] Phase 22: Cross-platform Packaging
-- [ ] Phase 23: Performance Optimization
+- [x] Phase 2: Runtime Abstraction
+- [x] Phase 3: Model Management
+- [x] Phase 4: Text Generation
+- [x] Phase 5: FastAPI Server
+- [x] Phase 6: VS Code Extension
+- [x] Phase 7: Repository Intelligence
+- [x] Phase 8: Hybrid Search + Embeddings + RAG
+
+### Remaining
+
+- [ ] Phase 9: Tool System
+- [ ] Phase 10: Safe Terminal
+- [ ] Phase 11: File Editing and Diff
+- [ ] Phase 12: Testing Loop
+- [ ] Phase 13: Git Integration
+- [ ] Phase 14: Agent Engine
+- [ ] Phase 15: Memory
+- [ ] Phase 16: Security Hardening
+- [ ] Phase 17: Cross-platform Packaging
+- [ ] Phase 18: Performance Optimization
 
 ## Project Structure
 
@@ -73,18 +73,18 @@ CodeForge-AI/
   codeforge/           # Main Python package
     packages/          # Core packages
       hardware/        # Phase 1: Hardware detection
-      core/            # Shared utilities
-      runtime/         # Model runtime (Phase 3+)
-      models/          # Model management (Phase 4+)
-      indexing/        # Codebase indexing (Phase 11+)
-      search/          # Search engine (Phase 12+)
-      rag/             # RAG pipeline (Phase 13+)
-      memory/          # Memory system (Phase 20+)
-      tools/           # Tool system (Phase 14+)
-      security/        # Security (Phase 21+)
-      git/             # Git integration (Phase 18+)
-    apps/
-      server/          # FastAPI server
+      runtime/         # Phase 2: Runtime abstraction
+      models/          # Phase 3: Model management
+      generation/      # Phase 4: Text generation
+      indexing/        # Phase 7: Repository indexing
+      embeddings/      # Phase 8: Embedding providers
+      chunks/          # Phase 8: Code chunking
+      vector/          # Phase 8: Vector store
+      search/          # Phase 8: Search engine
+      rag/             # Phase 8: RAG pipeline
+    api/               # FastAPI server (Phase 5)
+    cli.py             # CLI entry point
+  codeforge-vscode/    # VS Code extension (Phase 6)
   tests/               # Test suite
   docs/                # Documentation
 ```
@@ -92,10 +92,100 @@ CodeForge-AI/
 ## Testing
 
 ```bash
+# Run all tests (515+ tests)
 pytest tests/ -v
+
+# Run specific phase tests
+pytest tests/unit/test_search_rag.py -v    # Phase 8: Search + RAG
+pytest tests/unit/test_indexing.py -v       # Phase 7: Repository Intelligence
+pytest tests/unit/test_api.py -v           # Phase 5: API Server
+
+# Linting
 ruff check codeforge/ tests/
-mypy codeforge/ --ignore-missing-imports
 ```
+
+## CLI Commands
+
+```bash
+# Hardware & Diagnostics
+codeforge hardware          # Show detected hardware
+codeforge doctor            # Run diagnostics
+
+# Runtime
+codeforge runtime           # Show runtime info
+codeforge device            # List available devices
+
+# Model Management
+codeforge models            # List registered models
+codeforge model list        # List models
+codeforge model inspect     # Inspect model details
+codeforge model load        # Load a model
+codeforge model unload      # Unload a model
+codeforge model discover    # Discover new models
+
+# Generation
+codeforge generate          # Generate text
+codeforge chat              # Interactive chat
+
+# Search & RAG (Phase 8)
+codeforge search "UserService"    # Search code
+codeforge rag "How does auth work?"  # RAG query
+codeforge embeddings-index        # Build embeddings
+codeforge embeddings-status       # Check embedding status
+
+# Server
+codeforge serve              # Start API server
+```
+
+## API Endpoints
+
+### Health
+- `GET /v1/health` — Health check
+- `GET /v1/health/ready` — Readiness check
+
+### Hardware
+- `GET /v1/hardware` — Hardware info
+- `GET /v1/hardware/gpu` — GPU info
+
+### Runtime
+- `GET /v1/runtime` — Runtime info
+- `GET /v1/runtime/capabilities` — Available capabilities
+
+### Models
+- `GET /v1/models` — List models
+- `GET /v1/models/{id}` — Get model
+- `POST /v1/models/{id}/load` — Load model
+- `POST /v1/models/{id}/unload` — Unload model
+
+### Generation
+- `POST /v1/generate` — Generate text
+- `POST /v1/generate/stream` — Streaming generation
+
+### Embeddings
+- `POST /v1/embeddings` — Create embedding
+- `POST /v1/embeddings/batch` — Batch embeddings
+- `GET /v1/embeddings/health` — Embedding health
+- `GET /v1/embeddings/config` — Embedding config
+
+### Search
+- `POST /v1/search` — Search code
+- `GET /v1/search/modes` — Available search modes
+
+### RAG
+- `POST /v1/rag/query` — RAG query
+
+### Workspaces
+- `GET /v1/workspaces` — List workspaces
+- `POST /v1/workspaces/index` — Index workspace
+- `GET /v1/workspaces/{id}` — Get workspace
+- `GET /v1/workspaces/{id}/files` — Get files
+- `GET /v1/workspaces/{id}/symbols` — Get symbols
+- `GET /v1/workspaces/{id}/dependencies` — Get dependencies
+- `POST /v1/workspaces/{id}/refresh` — Refresh index
+
+### OpenAI Compatible
+- `POST /v1/chat/completions` — Chat completions
+- `POST /v1/completions` — Text completions
 
 ## License
 
