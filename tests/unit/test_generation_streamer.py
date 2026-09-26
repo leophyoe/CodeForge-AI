@@ -97,6 +97,7 @@ class TestBlockingStreamer:
 
     def test_get_finish_reason(self) -> None:
         from codeforge.packages.generation.schemas import FinishReason
+
         bs = BlockingStreamer(TokenStreamer(MockProvider(), "model"))
         events = bs.collect("test")
         reason = bs.get_finish_reason(events)
@@ -104,6 +105,7 @@ class TestBlockingStreamer:
 
     def test_get_finish_reason_error(self) -> None:
         from codeforge.packages.generation.schemas import FinishReason
+
         bs = BlockingStreamer(TokenStreamer(MockProviderError(), "model"))
         events = bs.collect("test")
         reason = bs.get_finish_reason(events)

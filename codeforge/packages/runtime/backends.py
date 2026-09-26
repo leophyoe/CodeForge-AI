@@ -122,9 +122,7 @@ class CUDABackend(RuntimeBackend):
             # Warm up the device
             _ = torch.cuda.current_device()
             self._initialized = True
-            logger.info(
-                "CUDA backend initialized on device %d", self._device_index
-            )
+            logger.info("CUDA backend initialized on device %d", self._device_index)
             return BackendStatus.READY
         except Exception as e:
             logger.error("CUDA backend initialization failed: %s", e)
@@ -224,9 +222,7 @@ class CUDABackend(RuntimeBackend):
                 allocated_gb=round(allocated_gb, 2),
                 reserved_gb=round(reserved_gb, 2),
                 usage_percent=(
-                    round((total_gb - free_gb) / total_gb * 100, 1)
-                    if total_gb > 0
-                    else 0.0
+                    round((total_gb - free_gb) / total_gb * 100, 1) if total_gb > 0 else 0.0
                 ),
             )
         except Exception:

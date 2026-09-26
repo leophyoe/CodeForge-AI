@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 DEFAULT_IGNORE_DIRS = {
     ".git",
@@ -121,10 +125,8 @@ class IgnoreRules:
         self.custom_patterns: list[re.Pattern[str]] = []
         if custom_patterns:
             for p in custom_patterns:
-                try:
+                with contextlib.suppress(re.error):
                     self.custom_patterns.append(re.compile(p))
-                except re.error:
-                    pass
 
     def load_gitignore(self, gitignore_path: Path) -> None:
         if not gitignore_path.exists():
@@ -151,10 +153,7 @@ class IgnoreRules:
         for _, pattern in self.gitignore_patterns:
             if pattern.search(dir_name) or pattern.search(rel_path):
                 return True
-        for pattern in self.custom_patterns:
-            if pattern.search(dir_name):
-                return True
-        return False
+        return any(pattern.search(dir_name) for pattern in self.custom_patterns)
 
     def should_ignore_file(self, file_path: Path, rel_path: str = "") -> bool:
         name = file_path.name
@@ -176,10 +175,7 @@ class IgnoreRules:
 
     def is_secret(self, file_path: Path) -> bool:
         name = file_path.name
-        for pat in SECRET_PATTERNS:
-            if pat.search(name) or pat.search(str(file_path)):
-                return True
-        return False
+        return any(pat.search(name) or pat.search(str(file_path)) for pat in SECRET_PATTERNS)
 
 
 def is_binary_file(file_path: Path, check_size: int = BINARY_CHECK_SIZE) -> bool:
@@ -193,6 +189,4 @@ def is_binary_file(file_path: Path, check_size: int = BINARY_CHECK_SIZE) -> bool
     if b"\x00" in chunk:
         return True
     null_count = chunk.count(b"\x00")
-    if null_count > 0 and null_count / len(chunk) > 0.1:
-        return True
-    return False
+    return bool(null_count > 0 and null_count / len(chunk) > 0.1)

@@ -56,29 +56,31 @@ class EmbeddingManager:
 
     def embed_batch(self, texts: list[str], use_cache: bool = True) -> list[EmbeddingResult]:
         model_id = self.config.model
-        results: list[EmbeddingResult] = []
+        results: list[EmbeddingResult | None] = [None] * len(texts)
         uncached_texts: list[tuple[int, str]] = []
 
         for i, text in enumerate(texts):
             if use_cache:
                 cached = self.cache.get(text, model_id)
                 if cached is not None:
-                    results.append(
-                        EmbeddingResult(
-                            text=text,
-                            embedding=cached,
-                            model=model_id,
-                            cached=True,
-                        )
+                    results[i] = EmbeddingResult(
+                        text=text,
+                        embedding=cached,
+                        model=model_id,
+                        cached=True,
                     )
                     continue
             uncached_texts.append((i, text))
-            results.append(None)  # type: ignore
 
         if uncached_texts:
             start = time.time()
             provider = self.get_provider()
             batch_embeddings = provider.embed_batch([t for _, t in uncached_texts])
+            if len(batch_embeddings) != len(uncached_texts):
+                raise ValueError(
+                    f"Embedding provider returned {len(batch_embeddings)} vectors "
+                    f"for {len(uncached_texts)} texts"
+                )
             duration = (time.time() - start) * 1000
 
             for idx, (orig_idx, text) in enumerate(uncached_texts):
@@ -93,7 +95,9 @@ class EmbeddingManager:
                     cached=False,
                 )
 
-        return results  # type: ignore
+        if any(r is None for r in results):
+            raise ValueError("Embedding batch left unresolved entries")
+        return [r for r in results if r is not None]
 
     def get_dimension(self) -> int:
         return self.get_provider().get_dimension()

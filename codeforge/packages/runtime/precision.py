@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 class PrecisionManager:
     """Manages supported precision types and dtype selection."""
 
-    def get_supported_dtypes(
-        self, device_type: DeviceType = DeviceType.CPU
-    ) -> PrecisionInfo:
+    def get_supported_dtypes(self, device_type: DeviceType = DeviceType.CPU) -> PrecisionInfo:
         """Detect supported precision types for a given device."""
         float32 = True
         float16 = False
@@ -29,7 +27,6 @@ class PrecisionManager:
                 bfloat16_supported=bfloat16,
                 default_dtype="float32",
             )
-
 
         if device_type == DeviceType.CPU:
             float16 = True
@@ -80,9 +77,7 @@ class PrecisionManager:
         info = self.get_supported_dtypes(device_type)
         return info.default_dtype
 
-    def validate_dtype(
-        self, dtype_str: str, device_type: DeviceType = DeviceType.CPU
-    ) -> bool:
+    def validate_dtype(self, dtype_str: str, device_type: DeviceType = DeviceType.CPU) -> bool:
         """Validate that a dtype is supported on the given device."""
         info = self.get_supported_dtypes(device_type)
         dtype_map = {

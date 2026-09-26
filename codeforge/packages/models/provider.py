@@ -96,6 +96,7 @@ class LocalPyTorchProvider(ModelProvider):
         self._torch_available = False
         try:
             import torch  # noqa: F401
+
             self._torch_available = True
         except ImportError:
             logger.info("PyTorch not available")
@@ -120,6 +121,7 @@ class LocalPyTorchProvider(ModelProvider):
     def unload_model(self, model_instance: object) -> None:
         try:
             import torch
+
             if hasattr(model_instance, "cpu"):
                 model_instance.cpu()
             del model_instance
@@ -152,14 +154,16 @@ class LocalPyTorchProvider(ModelProvider):
 
             if not self.is_loaded(model_instance):
                 return GenerationResult(
-                    text="", finish_reason="error",
+                    text="",
+                    finish_reason="error",
                     usage={"error": "Model not loaded"},
                 )
 
             tokenizer = self._get_tokenizer_from_model(model_instance)
             if tokenizer is None:
                 return GenerationResult(
-                    text="", finish_reason="error",
+                    text="",
+                    finish_reason="error",
                     usage={"error": "No tokenizer available"},
                 )
 
@@ -193,12 +197,18 @@ class LocalPyTorchProvider(ModelProvider):
         except Exception as e:
             logger.debug("Generation failed: %s", e)
             return GenerationResult(
-                text="", finish_reason="error", usage={"error": str(e)},
+                text="",
+                finish_reason="error",
+                usage={"error": str(e)},
             )
 
     def stream_generate(
-        self, model_instance: object, prompt: str,
-        max_tokens: int = 256, temperature: float = 0.7, top_p: float = 0.9,
+        self,
+        model_instance: object,
+        prompt: str,
+        max_tokens: int = 256,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
     ) -> Any:
         result = self.generate(model_instance, prompt, max_tokens, temperature, top_p)
         for char in result.text:
@@ -206,8 +216,11 @@ class LocalPyTorchProvider(ModelProvider):
         yield StreamToken(text="", is_end=True)
 
     def chat(
-        self, model_instance: object, messages: list[dict],
-        max_tokens: int = 256, temperature: float = 0.7,
+        self,
+        model_instance: object,
+        messages: list[dict],
+        max_tokens: int = 256,
+        temperature: float = 0.7,
     ) -> GenerationResult:
         prompt_parts = []
         for msg in messages:
@@ -299,6 +312,7 @@ class LocalPyTorchProvider(ModelProvider):
 
     def _resolve_device(self, device: str) -> str:
         import torch
+
         if device == "auto":
             if torch.cuda.is_available():
                 return "cuda"
@@ -309,6 +323,7 @@ class LocalPyTorchProvider(ModelProvider):
 
     def _resolve_dtype(self, dtype: str, device: str) -> str:
         import torch
+
         if dtype == "auto":
             if device == "cuda" and torch.cuda.is_available():
                 if hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
@@ -318,7 +333,11 @@ class LocalPyTorchProvider(ModelProvider):
         return dtype
 
     def _load_model_from_path(
-        self, path: Path, metadata: ModelMetadata, device: str, dtype: str  # noqa: ARG002
+        self,
+        path: Path,
+        metadata: ModelMetadata,  # noqa: ARG002
+        device: str,
+        dtype: str,
     ) -> Any:
         try:
             hf_files = ["config.json", "pytorch_model.bin", "model.safetensors"]
@@ -337,16 +356,16 @@ class LocalPyTorchProvider(ModelProvider):
             logger.debug("Model loading failed: %s", e)
         return None
 
-    def _load_huggingface_model(
-        self, path: Path, device: str, dtype: str
-    ) -> Any:
+    def _load_huggingface_model(self, path: Path, device: str, dtype: str) -> Any:
         try:
             from transformers import AutoConfig, AutoModelForCausalLM
 
             config = AutoConfig.from_pretrained(str(path), trust_remote_code=True)
             torch_dtype = _str_to_torch_dtype(dtype)
             model = AutoModelForCausalLM.from_pretrained(
-                str(path), config=config, torch_dtype=torch_dtype,
+                str(path),
+                config=config,
+                torch_dtype=torch_dtype,
                 device_map=device if device != "cpu" else None,
                 trust_remote_code=True,
             )
@@ -359,10 +378,14 @@ class LocalPyTorchProvider(ModelProvider):
         return None
 
     def _load_pytorch_checkpoint(
-        self, file_path: Path, device: str, dtype: str  # noqa: ARG002
+        self,
+        file_path: Path,
+        device: str,
+        dtype: str,  # noqa: ARG002
     ) -> Any:
         try:
             import torch
+
             state_dict = torch.load(str(file_path), map_location=device, weights_only=True)
             if isinstance(state_dict, dict) and "model" in state_dict:
                 return state_dict["model"]
@@ -382,6 +405,7 @@ class LocalPyTorchProvider(ModelProvider):
         try:
             import torch
             from safetensors.torch import load_file
+
             torch_dtype = _str_to_torch_dtype(dtype)
             merged: dict = {}
             for f in files:
@@ -403,6 +427,7 @@ class LocalPyTorchProvider(ModelProvider):
 
 def _str_to_torch_dtype(dtype_str: str) -> Any:
     import torch
+
     dtype_map = {
         "float32": torch.float32,
         "float16": torch.float16,

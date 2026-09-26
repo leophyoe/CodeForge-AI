@@ -66,16 +66,18 @@ class ContextBuilder:
         ]
 
         if context:
-            messages.append({
-                "role": "system",
-                "content": (
-                    "RETRIEVED REPOSITORY CONTEXT:\n\n"
-                    "The following code snippets were retrieved from the repository. "
-                    "Use them to answer the user's question. "
-                    "Cite sources using [Source N] format.\n\n"
-                    f"{context}"
-                ),
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "RETRIEVED REPOSITORY CONTEXT:\n\n"
+                        "The following code snippets were retrieved from the repository. "
+                        "Use them to answer the user's question. "
+                        "Cite sources using [Source N] format.\n\n"
+                        f"{context}"
+                    ),
+                }
+            )
 
         messages.append({"role": "user", "content": query})
         return messages

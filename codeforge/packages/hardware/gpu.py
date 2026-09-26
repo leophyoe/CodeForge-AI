@@ -184,9 +184,7 @@ def _detect_amd_rocm() -> GPUInfo | None:
         name = name_match.group(1).strip() if name_match else "AMD GPU"
 
         # Check for VRAM info
-        vram_match = re.search(
-            r"Memory Size:\s+([\d.]+)\s*(GB|MB|TB)", output, re.IGNORECASE
-        )
+        vram_match = re.search(r"Memory Size:\s+([\d.]+)\s*(GB|MB|TB)", output, re.IGNORECASE)
         vram_gb: float | None = None
         if vram_match:
             size = float(vram_match.group(1))

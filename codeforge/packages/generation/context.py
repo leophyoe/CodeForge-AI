@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from .errors import ContextLengthExceededError, TokenizationError
 
@@ -18,7 +18,7 @@ DEFAULT_MAX_CONTEXT = 2048
 class ContextManager:
     """Handles tokenization and context length validation."""
 
-    def __init__(self, tokenizer_manager: object | None = None) -> None:
+    def __init__(self, tokenizer_manager: Any = None) -> None:
         self._tokenizer_manager = tokenizer_manager
 
     def tokenize(self, text: str, model_path: str | Path | None = None) -> list[int]:
@@ -27,11 +27,11 @@ class ContextManager:
             raise TokenizationError("", "No tokenizer manager configured")
         try:
             if model_path is not None:
-                return self._tokenizer_manager.tokenize(model_path, text)
+                return cast("list[int]", self._tokenizer_manager.tokenize(model_path, text))
             if hasattr(self._tokenizer_manager, "tokenize") and callable(
                 self._tokenizer_manager.tokenize
             ):
-                return self._tokenizer_manager.tokenize(text)
+                return cast("list[int]", self._tokenizer_manager.tokenize(text))
             return []
         except Exception as e:
             raise TokenizationError(str(model_path or ""), str(e)) from e
@@ -71,7 +71,9 @@ class ContextManager:
         truncated = tokens[-max_context:] if keep_end else tokens[:max_context]
         if self._tokenizer_manager and hasattr(self._tokenizer_manager, "decode"):
             try:
-                return self._tokenizer_manager.decode(truncated)
+                if model_path is not None:
+                    return cast("str", self._tokenizer_manager.decode(model_path, truncated))
+                return cast("str", self._tokenizer_manager.decode(truncated))
             except Exception:
                 pass
         return text[:max_context]

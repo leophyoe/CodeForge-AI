@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from ..embeddings.manager import EmbeddingManager
-from ..vector.store import VectorStore
+from typing import TYPE_CHECKING
+
 from .models import SearchQuery, SearchResult
+
+if TYPE_CHECKING:
+    from codeforge.packages.embeddings.manager import EmbeddingManager
+    from codeforge.packages.vector.store import VectorStore
 
 
 class SemanticSearch:
@@ -34,19 +38,21 @@ class SemanticSearch:
 
         results: list[SearchResult] = []
         for vr in vector_results:
-            results.append(SearchResult(
-                chunk_id=vr.chunk_id,
-                relative_path=vr.metadata.get("relative_path", ""),
-                language=vr.metadata.get("language", ""),
-                symbol_name=vr.metadata.get("symbol_name", ""),
-                qualified_name=vr.metadata.get("qualified_name", ""),
-                start_line=vr.metadata.get("start_line", 0),
-                end_line=vr.metadata.get("end_line", 0),
-                content=vr.content,
-                score=vr.score,
-                match_type="semantic",
-                metadata=vr.metadata,
-            ))
+            results.append(
+                SearchResult(
+                    chunk_id=vr.chunk_id,
+                    relative_path=vr.metadata.get("relative_path", ""),
+                    language=vr.metadata.get("language", ""),
+                    symbol_name=vr.metadata.get("symbol_name", ""),
+                    qualified_name=vr.metadata.get("qualified_name", ""),
+                    start_line=vr.metadata.get("start_line", 0),
+                    end_line=vr.metadata.get("end_line", 0),
+                    content=vr.content,
+                    score=vr.score,
+                    match_type="semantic",
+                    metadata=vr.metadata,
+                )
+            )
 
         return results
 

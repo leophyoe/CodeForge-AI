@@ -148,10 +148,12 @@ manager.indexer.cancel_job(job.job_id)
 ### Workspace Authorization
 
 ```python
-manager = WorkspaceManager(allowed_roots=[
-    "/home/user/projects",
-    "/home/user/repos",
-])
+manager = WorkspaceManager(
+    allowed_roots=[
+        "/home/user/projects",
+        "/home/user/repos",
+    ]
+)
 ```
 
 Unauthorized paths are rejected with `UnauthorizedWorkspaceError`.

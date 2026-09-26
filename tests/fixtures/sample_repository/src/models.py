@@ -1,4 +1,5 @@
 """Models module."""
+
 from dataclasses import dataclass
 
 

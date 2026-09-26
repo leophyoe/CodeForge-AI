@@ -211,6 +211,20 @@ class TestFileScanner:
         with pytest.raises(ScannerError):
             scanner.scan(f)
 
+    def test_scan_ignores_file_symlink_escaping_root(self, tmp_path):
+        root = tmp_path / "root"
+        root.mkdir()
+        outside = tmp_path / "secret.txt"
+        outside.write_text("secret")
+        (root / "link.txt").symlink_to(outside)
+        (root / "real.txt").write_text("ok")
+        scanner = FileScanner()
+        result = scanner.scan(root)
+        paths = [f.relative_path for f in result.files]
+        assert "real.txt" in paths
+        assert "link.txt" not in paths
+        assert result.ignored_count >= 1
+
 
 class TestSymbolExtractor:
     def test_python_class_extraction(self):
@@ -564,3 +578,17 @@ class TestSecurity:
     def test_symlink_check(self, manager, tmp_workspace):
         manager.create_workspace(str(tmp_workspace), "test")
         assert manager.check_symlink_escape(tmp_workspace, tmp_workspace) is True
+
+    def test_symlink_check_prefix_sibling_not_inside(self, manager, tmp_path):
+        ws = tmp_path / "ws"
+        ws_evil = tmp_path / "ws-evil"
+        ws.mkdir()
+        ws_evil.mkdir()
+        # A sibling sharing the root's name prefix must not count as inside
+        # (the old startswith check accepted it).
+        assert manager.check_symlink_escape(ws_evil, ws) is False
+        # Explicit .. traversal resolving to the sibling also rejected.
+        assert manager.check_symlink_escape(ws / ".." / "ws-evil", ws) is False
+        # Genuine child is accepted.
+        (ws / "sub").mkdir()
+        assert manager.check_symlink_escape(ws / "sub", ws) is True

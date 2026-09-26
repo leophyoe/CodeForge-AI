@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import time
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from codeforge.packages.indexing.manager import WorkspaceManager
-from codeforge.packages.indexing.models import IndexStatus
 
 router = APIRouter(prefix="/v1/workspaces", tags=["workspaces"])
 
@@ -84,7 +80,7 @@ async def index_workspace(request: IndexRequest) -> dict:
     try:
         ws = manager.create_workspace(request.root, request.name)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     job = manager.index_workspace(ws.workspace_id, background=True)
     return {
@@ -137,7 +133,7 @@ async def get_project_structure(workspace_id: str) -> dict:
     try:
         structure = manager.get_project_structure(workspace_id)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return structure
 
 
@@ -149,7 +145,7 @@ async def get_workspace_symbols(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
 ) -> dict:
-    from ..packages.indexing.models import SymbolKind
+    from codeforge.packages.indexing.models import SymbolKind
 
     manager = get_manager()
     symbol_kind = SymbolKind(kind) if kind else None

@@ -57,18 +57,14 @@ class MemoryManager:
                 allocated_gb=round(allocated_gb, 2),
                 reserved_gb=round(reserved_gb, 2),
                 usage_percent=(
-                    round((total_gb - free_gb) / total_gb * 100, 1)
-                    if total_gb > 0
-                    else 0.0
+                    round((total_gb - free_gb) / total_gb * 100, 1) if total_gb > 0 else 0.0
                 ),
             )
         except Exception as e:
             logger.debug("Failed to get GPU memory: %s", e)
             return MemoryInfo()
 
-    def get_memory_for_device(
-        self, device_type: DeviceType, device_index: int = 0
-    ) -> MemoryInfo:
+    def get_memory_for_device(self, device_type: DeviceType, device_index: int = 0) -> MemoryInfo:
         """Get memory info for the specified device type."""
         if device_type == DeviceType.CUDA:
             return self.get_gpu_memory(device_index)

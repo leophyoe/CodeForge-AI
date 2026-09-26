@@ -195,10 +195,20 @@ class TestCodeChunker:
     def test_chunk_with_symbols(self):
         source = "class User:\n    def save(self):\n        pass\n"
         symbols = [
-            {"name": "User", "kind": "class", "start_line": 0, "end_line": 2,
-             "qualified_name": "User"},
-            {"name": "save", "kind": "method", "start_line": 1, "end_line": 2,
-             "qualified_name": "User.save"},
+            {
+                "name": "User",
+                "kind": "class",
+                "start_line": 0,
+                "end_line": 2,
+                "qualified_name": "User",
+            },
+            {
+                "name": "save",
+                "kind": "method",
+                "start_line": 1,
+                "end_line": 2,
+                "qualified_name": "User.save",
+            },
         ]
         chunker = CodeChunker()
         chunks = chunker.chunk_file(source, "python", symbols=symbols)
@@ -293,14 +303,38 @@ class TestLexicalSearch:
         assert len(results) == 1
         assert results[0].language == "python"
 
+    def test_regex_mode(self):
+        search = LexicalSearch()
+        query = SearchQuery(query=r"def \w+\(", use_regex=True)
+        chunks = [
+            {"chunk_id": "c1", "content": "def hello():", "language": "python"},
+            {"chunk_id": "c2", "content": "class hello:", "language": "python"},
+        ]
+        results = search.search(query, chunks)
+        # Old code ran re.escape() even in regex mode, so \w+ never matched.
+        assert len(results) == 1
+        assert results[0].chunk_id == "c1"
+
+    def test_regex_invalid_pattern_falls_back_to_literal(self):
+        search = LexicalSearch()
+        query = SearchQuery(query="def foo(", use_regex=True)
+        chunks = [{"chunk_id": "c1", "content": "syntax error near def foo("}]
+        results = search.search(query, chunks)
+        assert len(results) == 1
+        assert results[0].chunk_id == "c1"
+
 
 class TestSymbolSearch:
     def test_exact_symbol(self):
         search = SymbolSearch()
         query = SearchQuery(query="UserService", limit=10)
         symbols = [
-            {"name": "UserService", "qualified_name": "UserService",
-             "kind": "class", "file_id": "f1"},
+            {
+                "name": "UserService",
+                "qualified_name": "UserService",
+                "kind": "class",
+                "file_id": "f1",
+            },
         ]
         results = search.search(query, symbols)
         assert len(results) == 1
@@ -310,8 +344,12 @@ class TestSymbolSearch:
         search = SymbolSearch()
         query = SearchQuery(query="User", limit=10)
         symbols = [
-            {"name": "UserService", "qualified_name": "UserService",
-             "kind": "class", "file_id": "f1"},
+            {
+                "name": "UserService",
+                "qualified_name": "UserService",
+                "kind": "class",
+                "file_id": "f1",
+            },
         ]
         results = search.search(query, symbols)
         assert len(results) == 1
@@ -323,12 +361,15 @@ class TestHybridSearch:
         hybrid = HybridSearch()
         query = SearchQuery(query="UserService", limit=10)
         chunks = [
-            {"chunk_id": "c1", "content": "class UserService:",
-             "language": "python"},
+            {"chunk_id": "c1", "content": "class UserService:", "language": "python"},
         ]
         symbols = [
-            {"name": "UserService", "qualified_name": "UserService",
-             "kind": "class", "file_id": "f1"},
+            {
+                "name": "UserService",
+                "qualified_name": "UserService",
+                "kind": "class",
+                "file_id": "f1",
+            },
         ]
         results = hybrid.search(query, chunks=chunks, symbols=symbols)
         assert len(results) >= 1
@@ -362,8 +403,13 @@ class TestContextBuilder:
     def test_token_budget(self):
         builder = ContextBuilder(RAGConfig(max_context_tokens=50))
         results = [
-            {"chunk_id": f"c{i}", "relative_path": f"f{i}.py", "start_line": 0, "end_line": 10,
-             "content": "x" * 200}
+            {
+                "chunk_id": f"c{i}",
+                "relative_path": f"f{i}.py",
+                "start_line": 0,
+                "end_line": 10,
+                "content": "x" * 200,
+            }
             for i in range(10)
         ]
         context, sources = builder.build_context(results)

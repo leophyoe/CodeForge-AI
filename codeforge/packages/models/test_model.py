@@ -201,6 +201,7 @@ class TransformerBlock:
 
     def __init__(self, hidden_size: int, num_heads: int) -> None:
         import torch.nn as nn
+
         self.attention = nn.MultiheadAttention(hidden_size, num_heads, batch_first=True)
         self.norm1 = nn.LayerNorm(hidden_size)
         self.norm2 = nn.LayerNorm(hidden_size)
@@ -219,8 +220,12 @@ class TransformerBlock:
     def state_dict(self) -> dict[str, Any]:
         """Get state dict."""
         state: dict[str, Any] = {}
-        for name, mod in [("attention", self.attention), ("norm1", self.norm1),
-                          ("norm2", self.norm2), ("ff", self.ff)]:
+        for name, mod in [
+            ("attention", self.attention),
+            ("norm1", self.norm1),
+            ("norm2", self.norm2),
+            ("ff", self.ff),
+        ]:
             for k, v in mod.state_dict().items():
                 state[f"{name}.{k}"] = v
         return state

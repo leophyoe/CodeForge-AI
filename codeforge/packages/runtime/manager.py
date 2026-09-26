@@ -50,9 +50,7 @@ class RuntimeManager:
         memory_info = self._memory_manager.get_memory_for_device(
             selected_device.device_type, selected_device.device_index
         )
-        precision_info = self._precision_manager.get_supported_dtypes(
-            selected_device.device_type
-        )
+        precision_info = self._precision_manager.get_supported_dtypes(selected_device.device_type)
 
         # Determine backend
         backend_name = _get_backend_name(selected_device.device_type)

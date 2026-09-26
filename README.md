@@ -52,19 +52,16 @@ Engine    Runtime
 - [x] Phase 6: VS Code Extension
 - [x] Phase 7: Repository Intelligence
 - [x] Phase 8: Hybrid Search + Embeddings + RAG
+- [x] Phase 9: Secure Tool System
 
 ### Remaining
 
-- [ ] Phase 9: Tool System
-- [ ] Phase 10: Safe Terminal
-- [ ] Phase 11: File Editing and Diff
-- [ ] Phase 12: Testing Loop
-- [ ] Phase 13: Git Integration
-- [ ] Phase 14: Agent Engine
-- [ ] Phase 15: Memory
-- [ ] Phase 16: Security Hardening
-- [ ] Phase 17: Cross-platform Packaging
-- [ ] Phase 18: Performance Optimization
+- [ ] Phase 10: File Editing + Terminal
+- [ ] Phase 11: Agent Engine
+- [ ] Phase 12: Memory
+- [ ] Phase 13: Security Hardening
+- [ ] Phase 14: Cross-platform Packaging
+- [ ] Phase 15: Performance Optimization
 
 ## Project Structure
 

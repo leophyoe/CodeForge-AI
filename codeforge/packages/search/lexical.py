@@ -28,23 +28,25 @@ class LexicalSearch:
 
             score = self._score_content(content, pattern, query)
             if score > 0:
-                results.append(SearchResult(
-                    chunk_id=chunk.get("chunk_id", ""),
-                    file_id=chunk.get("file_id", ""),
-                    relative_path=chunk.get("relative_path", ""),
-                    language=chunk.get("language", ""),
-                    symbol_name=chunk.get("symbol_name", ""),
-                    qualified_name=chunk.get("qualified_name", ""),
-                    start_line=chunk.get("start_line", 0),
-                    end_line=chunk.get("end_line", 0),
-                    content=content,
-                    score=score,
-                    match_type="lexical",
-                    metadata=chunk.get("metadata", {}),
-                ))
+                results.append(
+                    SearchResult(
+                        chunk_id=chunk.get("chunk_id", ""),
+                        file_id=chunk.get("file_id", ""),
+                        relative_path=chunk.get("relative_path", ""),
+                        language=chunk.get("language", ""),
+                        symbol_name=chunk.get("symbol_name", ""),
+                        qualified_name=chunk.get("qualified_name", ""),
+                        start_line=chunk.get("start_line", 0),
+                        end_line=chunk.get("end_line", 0),
+                        content=content,
+                        score=score,
+                        match_type="lexical",
+                        metadata=chunk.get("metadata", {}),
+                    )
+                )
 
         results.sort(key=lambda r: r.score, reverse=True)
-        return results[:query.limit]
+        return results[: query.limit]
 
     def _build_pattern(self, query: SearchQuery) -> re.Pattern | None:
         if not query.query:
@@ -54,12 +56,11 @@ class LexicalSearch:
 
         if query.use_regex:
             try:
-                return re.compile(re.escape(query.query), flags)
+                return re.compile(query.query, flags)
             except re.error:
-                return None
+                return re.compile(re.escape(query.query), flags)
 
-        escaped = re.escape(query.query)
-        return re.compile(escaped, flags)
+        return re.compile(re.escape(query.query), flags)
 
     def _score_content(self, content: str, pattern: re.Pattern | None, query: SearchQuery) -> float:
         if not pattern:

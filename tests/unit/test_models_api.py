@@ -1,6 +1,5 @@
 """Tests for model API endpoints."""
 
-
 from fastapi.testclient import TestClient
 
 from codeforge.apps.server.app import app

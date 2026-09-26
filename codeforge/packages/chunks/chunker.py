@@ -25,9 +25,7 @@ class CodeChunker:
             return self._chunk_by_symbols(
                 source, language, relative_path, file_id, workspace_id, symbols
             )
-        return self._chunk_by_structure(
-            source, language, relative_path, file_id, workspace_id
-        )
+        return self._chunk_by_structure(source, language, relative_path, file_id, workspace_id)
 
     def _chunk_by_symbols(
         self,
@@ -61,24 +59,34 @@ class CodeChunker:
             token_est = max(1, len(content) // 4)
             if token_est > self.config.max_chunk_tokens:
                 sub_chunks = self._split_large_chunk(
-                    content, lines, start, language, relative_path,
-                    file_id, workspace_id, name, qualified, parent
+                    content,
+                    lines,
+                    start,
+                    language,
+                    relative_path,
+                    file_id,
+                    workspace_id,
+                    name,
+                    qualified,
+                    parent,
                 )
                 chunks.extend(sub_chunks)
             else:
-                chunks.append(CodeChunk(
-                    workspace_id=workspace_id,
-                    file_id=file_id,
-                    relative_path=relative_path,
-                    language=language,
-                    symbol_name=name,
-                    qualified_name=qualified,
-                    parent_symbol=parent,
-                    start_line=start,
-                    end_line=end - 1,
-                    content=content,
-                    metadata={"symbol_kind": kind},
-                ))
+                chunks.append(
+                    CodeChunk(
+                        workspace_id=workspace_id,
+                        file_id=file_id,
+                        relative_path=relative_path,
+                        language=language,
+                        symbol_name=name,
+                        qualified_name=qualified,
+                        parent_symbol=parent,
+                        start_line=start,
+                        end_line=end - 1,
+                        content=content,
+                        metadata={"symbol_kind": kind},
+                    )
+                )
 
         if not chunks:
             chunks = self._chunk_by_structure(
@@ -99,30 +107,28 @@ class CodeChunker:
         boundaries = self._find_structure_boundaries(lines, language)
 
         if not boundaries:
-            return self._chunk_by_lines(
-                source, language, relative_path, file_id, workspace_id
-            )
+            return self._chunk_by_lines(source, language, relative_path, file_id, workspace_id)
 
         chunks: list[CodeChunk] = []
         for start, end, name in boundaries:
             content = "\n".join(lines[start:end])
             if not content.strip():
                 continue
-            chunks.append(CodeChunk(
-                workspace_id=workspace_id,
-                file_id=file_id,
-                relative_path=relative_path,
-                language=language,
-                symbol_name=name,
-                start_line=start,
-                end_line=end - 1,
-                content=content,
-            ))
+            chunks.append(
+                CodeChunk(
+                    workspace_id=workspace_id,
+                    file_id=file_id,
+                    relative_path=relative_path,
+                    language=language,
+                    symbol_name=name,
+                    start_line=start,
+                    end_line=end - 1,
+                    content=content,
+                )
+            )
 
         if not chunks:
-            return self._chunk_by_lines(
-                source, language, relative_path, file_id, workspace_id
-            )
+            return self._chunk_by_lines(source, language, relative_path, file_id, workspace_id)
 
         return chunks
 
@@ -144,15 +150,17 @@ class CodeChunker:
             end = min(i + chunk_size, len(lines))
             content = "\n".join(lines[i:end])
             if content.strip():
-                chunks.append(CodeChunk(
-                    workspace_id=workspace_id,
-                    file_id=file_id,
-                    relative_path=relative_path,
-                    language=language,
-                    start_line=i,
-                    end_line=end - 1,
-                    content=content,
-                ))
+                chunks.append(
+                    CodeChunk(
+                        workspace_id=workspace_id,
+                        file_id=file_id,
+                        relative_path=relative_path,
+                        language=language,
+                        start_line=i,
+                        end_line=end - 1,
+                        content=content,
+                    )
+                )
             i += chunk_size - overlap
 
         return chunks
@@ -165,7 +173,7 @@ class CodeChunker:
 
         for i, line in enumerate(lines):
             stripped = line.strip()
-            for pattern, kind in patterns:
+            for pattern, _kind in patterns:
                 match = re.match(pattern, stripped)
                 if match:
                     name = match.group(1) if match.lastindex else ""
@@ -236,7 +244,7 @@ class CodeChunker:
     def _split_large_chunk(
         self,
         content: str,
-        lines: list[str],
+        _lines: list[str],
         start_line: int,
         language: str,
         relative_path: str,
@@ -257,19 +265,21 @@ class CodeChunker:
             end = min(i + chunk_size, len(content_lines))
             chunk_content = "\n".join(content_lines[i:end])
             if chunk_content.strip():
-                chunks.append(CodeChunk(
-                    workspace_id=workspace_id,
-                    file_id=file_id,
-                    relative_path=relative_path,
-                    language=language,
-                    symbol_name=f"{symbol_name} (part {part + 1})" if part > 0 else symbol_name,
-                    qualified_name=qualified_name,
-                    parent_symbol=parent_symbol,
-                    start_line=start_line + i,
-                    end_line=start_line + end - 1,
-                    content=chunk_content,
-                    metadata={"symbol_kind": "split", "part": part + 1},
-                ))
+                chunks.append(
+                    CodeChunk(
+                        workspace_id=workspace_id,
+                        file_id=file_id,
+                        relative_path=relative_path,
+                        language=language,
+                        symbol_name=f"{symbol_name} (part {part + 1})" if part > 0 else symbol_name,
+                        qualified_name=qualified_name,
+                        parent_symbol=parent_symbol,
+                        start_line=start_line + i,
+                        end_line=start_line + end - 1,
+                        content=chunk_content,
+                        metadata={"symbol_kind": "split", "part": part + 1},
+                    )
+                )
             part += 1
             i += chunk_size - overlap
 

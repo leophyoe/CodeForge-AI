@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 router = APIRouter(tags=["search"])
@@ -40,7 +40,7 @@ class SearchResponse(BaseModel):
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest) -> SearchResponse:
     from codeforge.packages.search.hybrid import HybridSearch
-    from codeforge.packages.search.models import SearchQuery, SearchMode
+    from codeforge.packages.search.models import SearchMode, SearchQuery
 
     hybrid_search = HybridSearch()
 
@@ -54,9 +54,7 @@ async def search(request: SearchRequest) -> SearchResponse:
         symbol=request.symbol,
     )
 
-    results = await asyncio.to_thread(
-        hybrid_search.search, search_query, chunks=[], symbols=[]
-    )
+    results = await asyncio.to_thread(hybrid_search.search, search_query, chunks=[], symbols=[])
 
     return SearchResponse(
         results=[
@@ -64,7 +62,7 @@ async def search(request: SearchRequest) -> SearchResponse:
                 chunk_id=r.chunk_id,
                 content=r.content,
                 score=r.score,
-                file_path=r.file_path,
+                file_path=r.relative_path,
                 symbol_name=r.symbol_name,
                 start_line=r.start_line,
                 end_line=r.end_line,

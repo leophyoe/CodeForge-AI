@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .errors import ScannerError
 from .ignore import IgnoreRules, is_binary_file
 from .languages import detect_language
 from .models import FileRecord, FileStatus
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass
@@ -66,7 +69,7 @@ class FileScanner:
                 if entry.is_symlink() and not self.follow_symlinks:
                     try:
                         resolved = entry.resolve()
-                        if not str(resolved).startswith(str(root.resolve())):
+                        if not resolved.is_relative_to(root.resolve()):
                             continue
                     except OSError:
                         continue
@@ -74,6 +77,15 @@ class FileScanner:
 
             elif entry.is_file():
                 rel_path = str(entry.relative_to(root))
+                if entry.is_symlink() and not self.follow_symlinks:
+                    try:
+                        resolved = entry.resolve()
+                        if not resolved.is_relative_to(root.resolve()):
+                            result.ignored_count += 1
+                            continue
+                    except OSError:
+                        result.ignored_count += 1
+                        continue
                 if self.ignore_rules.should_ignore_file(entry, rel_path):
                     result.ignored_count += 1
                     continue

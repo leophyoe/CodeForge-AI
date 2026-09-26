@@ -130,9 +130,7 @@ class TestHardwareInfo:
         disk = DiskInfo(total_gb=500.0, free_gb=250.0)
         pt = PyTorchInfo(installed=True, version="2.1.0")
 
-        info = HardwareInfo(
-            cpu=cpu, ram=ram, gpu=gpu, disk=disk, pytorch=pt
-        )
+        info = HardwareInfo(cpu=cpu, ram=ram, gpu=gpu, disk=disk, pytorch=pt)
 
         assert info.cpu_model == "TestCPU"
         assert info.cpu_cores_physical == 8

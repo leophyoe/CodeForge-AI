@@ -6,6 +6,7 @@ from starlette.testclient import TestClient
 
 from codeforge.api import create_app
 from codeforge.api.config import APIConfig, AppConfig, CORSConfig, RateLimitConfig
+from codeforge.api.middleware import _WindowEntry
 
 
 def _make_app():
@@ -427,9 +428,7 @@ class TestCORS:
             "/v1/health",
             headers={"Origin": "http://example.com"},
         )
-        assert "access-control-allow-origin" not in {
-            k.lower() for k in response.headers
-        }
+        assert "access-control-allow-origin" not in {k.lower() for k in response.headers}
 
     def test_cors_enabled(self) -> None:
         client = TestClient(_make_app_with_cors(), raise_server_exceptions=False)
@@ -451,13 +450,10 @@ class TestRateLimiting:
         app = _make_app_with_rate_limit()
         client = TestClient(app, raise_server_exceptions=False)
         responses = [client.get("/v1/health") for _ in range(20)]
-        non_200 = [r for r in responses if r.status_code != 200]
-        rate_limited = [r for r in responses if r.status_code == 429]
-        assert len(rate_limited) == 0, (
-            f"Health endpoint should not be rate limited, got {len(rate_limited)} 429s"
-        )
-        for r in non_200:
-            assert r.status_code != 429
+        # Pre-fix every request to a rate-limited app returned 500; the old
+        # assertion only excluded 429s, which let the 500s slip through.
+        statuses = [r.status_code for r in responses]
+        assert statuses == [200] * 20, f"health must stay 200, got {statuses}"
 
 
 # ── Path Traversal ────────────────────────────────────────────────────────
@@ -485,3 +481,219 @@ class TestErrorFormat:
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
+
+
+# ── Rate Limit Regressions (Phase 1–10 audit) ─────────────────────────────
+
+
+class TestRateLimitRegression:
+    """Pre-fix, RateLimitMiddleware lacked an `app` parameter and raised
+    exceptions from dispatch (which bypass FastAPI's ExceptionMiddleware) —
+    every request to a rate-limited app returned 500, never 429."""
+
+    def test_default_config_app_serves_200(self) -> None:
+        app = create_app()
+        client = TestClient(app, raise_server_exceptions=False)
+        for path in ("/v1/health", "/v1/models", "/v1/system", "/v1/tools"):
+            response = client.get(path)
+            assert response.status_code == 200, f"{path} -> {response.status_code}"
+
+    def test_burst_returns_429_not_500(self) -> None:
+        app = _make_app_with_rate_limit()
+        client = TestClient(app, raise_server_exceptions=False)
+        statuses = [client.get("/v1/models").status_code for _ in range(5)]
+        assert statuses == [200, 200, 200, 429, 429]
+        assert 500 not in statuses
+
+    def test_429_body_and_retry_after(self) -> None:
+        app = _make_app_with_rate_limit()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = None
+        for _ in range(4):
+            response = client.get("/v1/models")
+        assert response is not None
+        assert response.status_code == 429
+        body = response.json()
+        assert body["error"]["code"] == "rate_limit_exceeded"
+        assert "Retry-After" in response.headers
+        assert int(response.headers["Retry-After"]) >= 0
+
+    def test_429_has_request_id_and_security_headers(self) -> None:
+        # RateLimit must sit innermost so its 429 passes through RequestID
+        # and SecurityHeaders middlewares on the way out.
+        app = _make_app_with_rate_limit()
+        client = TestClient(app, raise_server_exceptions=False)
+        headers = {"X-Request-ID": "rl-corr-42"}
+        response = None
+        for _ in range(4):
+            response = client.get("/v1/models", headers=headers)
+        assert response is not None
+        assert response.status_code == 429
+        assert response.headers["X-Request-ID"] == "rl-corr-42"
+        assert response.json()["error"]["request_id"] == "rl-corr-42"
+        assert response.headers.get("X-Content-Type-Options") == "nosniff"
+
+    def test_client_table_bounded(self, monkeypatch) -> None:
+        import time as time_mod
+        from collections import deque
+
+        from codeforge.api.middleware import RateLimitMiddleware
+
+        async def _noop_app(scope, receive, send):  # noqa: ARG001
+            return None
+
+        monkeypatch.setattr(RateLimitMiddleware, "_MAX_CLIENTS", 5)
+        mw = RateLimitMiddleware(_noop_app, requests_per_minute=100)
+        now = time_mod.monotonic()
+
+        # Expired windows are dropped when over the cap (X-Forwarded-For
+        # is client-controlled, so the table must not grow without bound).
+        for i in range(10):
+            mw._clients[f"10.0.0.{i}"] = deque(  # noqa: SLF001
+                [_WindowEntry(timestamp=now - 3600.0)]
+            )
+        mw._prune_clients(now)  # noqa: SLF001
+        assert len(mw._clients) == 0  # noqa: SLF001
+
+        # Active windows: cap enforced by dropping oldest entries.
+        for i in range(10):
+            mw._clients[f"10.1.0.{i}"] = deque(  # noqa: SLF001
+                [_WindowEntry(timestamp=now)]
+            )
+        mw._prune_clients(now)  # noqa: SLF001
+        assert len(mw._clients) <= 5  # noqa: SLF001
+
+
+# ── Auth Regressions (Phase 1–10 audit) ───────────────────────────────────
+
+
+class TestAuthRegression:
+    """verify_api_key existed but was never wired into any router, and the
+    old body failed open (missing key -> allow)."""
+
+    @staticmethod
+    def _make_auth_app(api_key: str = "s3cret"):
+        config = AppConfig(
+            api=APIConfig(docs_enabled=True, auth_required=True, api_key=api_key),
+            rate_limit=RateLimitConfig(enabled=False),
+        )
+        return create_app(config)
+
+    def test_missing_key_401(self) -> None:
+        client = TestClient(self._make_auth_app(), raise_server_exceptions=False)
+        response = client.get("/v1/models")
+        assert response.status_code == 401
+        body = response.json()
+        assert body["error"]["code"] == "authentication_required"
+        assert body["error"]["request_id"]
+
+    def test_wrong_key_401(self) -> None:
+        client = TestClient(self._make_auth_app(), raise_server_exceptions=False)
+        response = client.get("/v1/models", headers={"X-API-Key": "wrong-key"})
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "authentication_required"
+
+    def test_correct_key_200(self) -> None:
+        client = TestClient(self._make_auth_app(), raise_server_exceptions=False)
+        response = client.get("/v1/models", headers={"X-API-Key": "s3cret"})
+        assert response.status_code == 200
+
+    def test_health_exempt_from_auth(self) -> None:
+        client = TestClient(self._make_auth_app(), raise_server_exceptions=False)
+        response = client.get("/v1/health")
+        assert response.status_code == 200
+
+    def test_fail_closed_when_no_key_configured(self, monkeypatch) -> None:
+        monkeypatch.delenv("CODEFORGE_API_KEY", raising=False)
+        client = TestClient(self._make_auth_app(api_key=""), raise_server_exceptions=False)
+        assert client.get("/v1/models").status_code == 401
+        # Health probe still works even when auth is misconfigured.
+        assert client.get("/v1/health").status_code == 200
+
+    def test_auth_off_by_default(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        assert client.get("/v1/models").status_code == 200
+
+
+# ── Error Request-ID Correlation ──────────────────────────────────────────
+
+
+class TestErrorCorrelation:
+    def test_api_error_request_id_matches_header(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "../../etc/passwd",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+            headers={"X-Request-ID": "corr-99"},
+        )
+        assert response.status_code == 400
+        body = response.json()
+        assert body["error"]["code"] == "path_traversal"
+        assert body["error"]["request_id"] == "corr-99"
+        assert response.headers["X-Request-ID"] == "corr-99"
+
+    def test_generated_error_request_id_is_uuid(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "../../etc/passwd",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+        assert response.status_code == 400
+        request_id = response.json()["error"]["request_id"]
+        assert len(request_id) >= 16
+        assert response.headers["X-Request-ID"] == request_id
+
+
+# ── Models List Shape (OpenAI-compatible) ─────────────────────────────────
+
+
+class TestListModelsShape:
+    def test_openai_list_shape(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.get("/v1/models")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["object"] == "list"
+        assert isinstance(data["data"], list)
+        for item in data["data"]:
+            assert item["object"] == "model"
+            assert "id" in item
+            assert "created" in item
+
+
+# ── Search Result Mapping (file_path regression) ──────────────────────────
+
+
+class TestSearchMappingRegression:
+    def test_search_maps_relative_path(self, monkeypatch) -> None:
+        from codeforge.packages.search.hybrid import HybridSearch
+        from codeforge.packages.search.models import SearchResult
+
+        def fake_search(self, query, chunks=None, symbols=None):  # noqa: ARG001
+            return [
+                SearchResult(
+                    chunk_id="c1",
+                    content="def main():",
+                    score=0.95,
+                    relative_path="src/app.py",
+                    symbol_name="main",
+                )
+            ]
+
+        monkeypatch.setattr(HybridSearch, "search", fake_search)
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post(
+            "/v1/search",
+            json={"workspace_id": "ws-1", "query": "main", "mode": "lexical"},
+        )
+        assert response.status_code == 200
+        items = response.json()["results"]
+        assert len(items) == 1
+        assert items[0]["file_path"] == "src/app.py"
+        assert items[0]["symbol_name"] == "main"

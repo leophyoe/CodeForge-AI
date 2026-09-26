@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import platform
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
@@ -27,7 +27,7 @@ async def health(request_id: str = Depends(get_request_id)) -> dict:  # noqa: AR
         "status": "ok",
         "version": __version__,
         "runtime": "python",
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 from codeforge.api.dependencies import (
     get_generation_service,
-    get_model_manager,
     validate_model_id,
 )
 from codeforge.packages.generation.errors import (
@@ -122,24 +121,29 @@ async def _stream_chat_response(
     created = int(time.time())
     chunk_id = f"chatcmpl-{uuid4().hex}"
 
-    messages = [
-        ChatMessage(role=m.role, content=m.content or "")
-        for m in request.messages
-    ]
+    messages = [ChatMessage(role=m.role, content=m.content or "") for m in request.messages]
     config = _build_generation_config(
-        request.temperature, request.max_tokens, request.top_p,
+        request.temperature,
+        request.max_tokens,
+        request.top_p,
     )
 
     yield _sse_chat_chunk(
-        chunk_id, model_id, created,
-        {"role": "assistant", "content": ""}, None,
+        chunk_id,
+        model_id,
+        created,
+        {"role": "assistant", "content": ""},
+        None,
     )
 
     for event in service.stream_chat(messages, model_id, config):
         if event.text:
             yield _sse_chat_chunk(
-                chunk_id, model_id, created,
-                {"content": event.text}, None,
+                chunk_id,
+                model_id,
+                created,
+                {"content": event.text},
+                None,
             )
 
     yield _sse_chat_chunk(chunk_id, model_id, created, {}, "stop")
@@ -154,18 +158,21 @@ async def _stream_completion_response(
     created = int(time.time())
     chunk_id = f"cmpl-{uuid4().hex}"
 
-    prompt_text = (
-        request.prompt if isinstance(request.prompt, str)
-        else request.prompt[0]
-    )
+    prompt_text = request.prompt if isinstance(request.prompt, str) else request.prompt[0]
     config = _build_generation_config(
-        request.temperature, request.max_tokens, request.top_p,
+        request.temperature,
+        request.max_tokens,
+        request.top_p,
     )
 
     for event in service.stream_generate(prompt_text, model_id, config):
         if event.text:
             yield _sse_completion_chunk(
-                chunk_id, model_id, created, event.text, None,
+                chunk_id,
+                model_id,
+                created,
+                event.text,
+                None,
             )
 
     yield _sse_completion_chunk(chunk_id, model_id, created, "", "stop")
@@ -193,15 +200,16 @@ async def chat_completions(
             headers=SSE_HEADERS,
         )
 
-    messages = [
-        ChatMessage(role=m.role, content=m.content or "")
-        for m in request.messages
-    ]
+    messages = [ChatMessage(role=m.role, content=m.content or "") for m in request.messages]
     config = _build_generation_config(
-        request.temperature, request.max_tokens, request.top_p,
+        request.temperature,
+        request.max_tokens,
+        request.top_p,
     )
     chat_req = ChatRequest(
-        messages=messages, model_id=model_id, config=config,
+        messages=messages,
+        model_id=model_id,
+        config=config,
     )
 
     try:
@@ -246,15 +254,16 @@ async def completions(
             headers=SSE_HEADERS,
         )
 
-    prompt_text = (
-        request.prompt if isinstance(request.prompt, str)
-        else request.prompt[0]
-    )
+    prompt_text = request.prompt if isinstance(request.prompt, str) else request.prompt[0]
     config = _build_generation_config(
-        request.temperature, request.max_tokens, request.top_p,
+        request.temperature,
+        request.max_tokens,
+        request.top_p,
     )
     gen_req = GenerationRequest(
-        prompt=prompt_text, model_id=model_id, config=config,
+        prompt=prompt_text,
+        model_id=model_id,
+        config=config,
     )
 
     try:
@@ -280,21 +289,3 @@ async def completions(
         ],
         "usage": response.usage.to_dict(),
     }
-
-
-@router.get("/models")
-async def list_models() -> dict[str, Any]:
-    manager = get_model_manager()
-    models = manager.list_models()
-    created = int(time.time())
-
-    data = [
-        {
-            "id": m.get("model_id", ""),
-            "object": "model",
-            "created": created,
-            "owned_by": "codeforge",
-        }
-        for m in models
-    ]
-    return {"object": "list", "data": data}

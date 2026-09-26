@@ -30,27 +30,27 @@ class SymbolSearch:
             chunk_id = sym.get("file_id", "")
             chunk = chunk_map.get(chunk_id, {})
 
-            results.append(SearchResult(
-                chunk_id=sym.get("symbol_id", chunk_id),
-                file_id=sym.get("file_id", ""),
-                relative_path=chunk.get("relative_path", sym.get("relative_path", "")),
-                language=sym.get("language", ""),
-                symbol_name=name,
-                qualified_name=qualified,
-                start_line=sym.get("start_line", 0),
-                end_line=sym.get("end_line", 0),
-                content=chunk.get("content", ""),
-                score=score,
-                match_type="symbol",
-                metadata={"symbol_kind": kind},
-            ))
+            results.append(
+                SearchResult(
+                    chunk_id=sym.get("symbol_id", chunk_id),
+                    file_id=sym.get("file_id", ""),
+                    relative_path=chunk.get("relative_path", sym.get("relative_path", "")),
+                    language=sym.get("language", ""),
+                    symbol_name=name,
+                    qualified_name=qualified,
+                    start_line=sym.get("start_line", 0),
+                    end_line=sym.get("end_line", 0),
+                    content=chunk.get("content", ""),
+                    score=score,
+                    match_type="symbol",
+                    metadata={"symbol_kind": kind},
+                )
+            )
 
         results.sort(key=lambda r: r.score, reverse=True)
-        return results[:query.limit]
+        return results[: query.limit]
 
-    def _score_symbol(
-        self, query_lower: str, name: str, qualified: str, kind: str
-    ) -> float:
+    def _score_symbol(self, query_lower: str, name: str, qualified: str, _kind: str) -> float:
         name_lower = name.lower()
         qualified_lower = qualified.lower()
 
@@ -64,9 +64,8 @@ class SymbolSearch:
             return 0.7
 
         query_parts = query_lower.split(".")
-        if len(query_parts) > 1:
-            if query_parts[-1] in name_lower:
-                return 0.6
+        if len(query_parts) > 1 and query_parts[-1] in name_lower:
+            return 0.6
 
         name_parts = name_lower.split("_")
         query_words = query_lower.split()

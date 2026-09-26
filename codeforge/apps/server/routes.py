@@ -146,9 +146,7 @@ async def get_model(model_id: str) -> dict:
     try:
         return mm.inspect_model(model_id).to_dict()
     except ModelNotFoundError as err:
-        raise HTTPException(
-            status_code=404, detail=f"Model '{model_id}' not found"
-        ) from err
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found") from err
 
 
 @models_router.get("/models/{model_id}/status")
@@ -181,9 +179,7 @@ async def load_model(model_id: str, device: str = "auto", dtype: str = "auto") -
     try:
         return mm.load_model(model_id, device=device, dtype=dtype)
     except ModelNotFoundError as err:
-        raise HTTPException(
-            status_code=404, detail=f"Model '{model_id}' not found"
-        ) from err
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found") from err
     except ModelAlreadyLoadedError:
         return {"model_id": model_id, "status": "already_loaded"}
     except Exception as err:
@@ -198,8 +194,6 @@ async def unload_model(model_id: str) -> dict:
     try:
         return mm.unload_model(model_id)
     except ModelNotFoundError as err:
-        raise HTTPException(
-            status_code=404, detail=f"Model '{model_id}' not found"
-        ) from err
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found") from err
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err)) from err

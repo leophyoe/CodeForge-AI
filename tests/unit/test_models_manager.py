@@ -13,6 +13,7 @@ class TestModelManager:
         model_dir = tmp_path / "models"
         model_dir.mkdir()
         from codeforge.packages.models.registry import ModelRegistry
+
         registry = ModelRegistry(registry_path=tmp_path / "test_registry.json")
         manager = ModelManager(model_dir=model_dir)
         manager._registry = registry  # noqa: SLF001

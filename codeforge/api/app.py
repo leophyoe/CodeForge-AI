@@ -36,6 +36,7 @@ async def _lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     yield
     logger.info("CodeForge AI server shutting down")
     from codeforge.api.dependencies import reset_singletons
+
     reset_singletons()
     logger.info("Singletons cleared")
 
@@ -55,16 +56,20 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         redoc_url=redoc_url,
         lifespan=_lifespan,
     )
+    application.state.config = config
 
-    application.add_middleware(SecurityHeadersMiddleware)
-    application.add_middleware(RequestIDMiddleware)
-    application.add_middleware(TimingMiddleware)
-
+    # Registration order: LAST added = OUTERMOST. RateLimit is added first so it
+    # sits innermost — its 429 responses then pass through RequestID, security,
+    # timing and CORS middlewares on the way out (headers on 429s).
     if config.rate_limit.enabled:
         application.add_middleware(
             RateLimitMiddleware,
             requests_per_minute=config.rate_limit.requests_per_minute,
         )
+
+    application.add_middleware(SecurityHeadersMiddleware)
+    application.add_middleware(RequestIDMiddleware)
+    application.add_middleware(TimingMiddleware)
 
     if config.cors.enabled:
         application.add_middleware(
@@ -76,13 +81,16 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         )
 
     application.add_exception_handler(APIError, api_error_handler)  # type: ignore[arg-type]
-    application.add_exception_handler(Exception, unhandled_exception_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(Exception, unhandled_exception_handler)
 
     _register_routers(application)
     return application
 
 
 def _register_routers(app: FastAPI) -> None:
+    from fastapi import Depends
+
+    from codeforge.api.dependencies import verify_api_key
     from codeforge.api.routers import (
         embeddings,
         generation,
@@ -92,15 +100,21 @@ def _register_routers(app: FastAPI) -> None:
         openai_compat,
         runtime,
         search,
+        terminal,
+        tools,
         workspaces,
     )
 
-    app.include_router(health.router, prefix="/v1")
-    app.include_router(hardware.router, prefix="/v1")
-    app.include_router(runtime.router, prefix="/v1")
-    app.include_router(models.router, prefix="/v1")
-    app.include_router(generation.router, prefix="/v1")
-    app.include_router(embeddings.router, prefix="/v1")
-    app.include_router(openai_compat.router, prefix="/v1")
-    app.include_router(search.router, prefix="/v1")
-    app.include_router(workspaces.router)
+    auth = [Depends(verify_api_key)]
+
+    app.include_router(health.router, prefix="/v1", dependencies=auth)
+    app.include_router(hardware.router, prefix="/v1", dependencies=auth)
+    app.include_router(runtime.router, prefix="/v1", dependencies=auth)
+    app.include_router(models.router, prefix="/v1", dependencies=auth)
+    app.include_router(generation.router, prefix="/v1", dependencies=auth)
+    app.include_router(embeddings.router, prefix="/v1", dependencies=auth)
+    app.include_router(openai_compat.router, prefix="/v1", dependencies=auth)
+    app.include_router(search.router, prefix="/v1", dependencies=auth)
+    app.include_router(tools.router, prefix="/v1", dependencies=auth)
+    app.include_router(terminal.router, dependencies=auth)
+    app.include_router(workspaces.router, dependencies=auth)

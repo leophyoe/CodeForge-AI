@@ -115,8 +115,7 @@ def device() -> None:
     for dev in devices:
         mem_str = f"{dev.total_memory_gb:.1f} GB" if dev.total_memory_gb else "N/A"
         is_default = (
-            dev.device_type == default.device_type
-            and dev.device_index == default.device_index
+            dev.device_type == default.device_type and dev.device_index == default.device_index
         )
         if dev.device_index > 0:
             device_str = f"{dev.device_type.value}:{dev.device_index}"
@@ -151,12 +150,14 @@ def doctor() -> None:
 
     try:
         import torch
+
         checks.append(("PyTorch", "PASS", torch.__version__))
     except ImportError:
         checks.append(("PyTorch", "WARN", "Not installed"))
 
     try:
         from codeforge.packages.runtime import DeviceManager
+
         dm = DeviceManager()
         dm.detect_available_devices()
         default = dm.get_default_device()
@@ -166,6 +167,7 @@ def doctor() -> None:
 
     try:
         from codeforge.packages.runtime import run_tensor_smoke_test
+
         result = run_tensor_smoke_test()
         if result["success"]:
             checks.append(("Tensor operation", "PASS", f"on {result['device']}"))
@@ -182,6 +184,7 @@ def doctor() -> None:
         checks.append(("Hardware detection", "FAIL", str(e)))
 
     from pathlib import Path
+
     data_dir = Path("./data")
     if data_dir.exists():
         checks.append(("Data directory", "PASS", str(data_dir.resolve())))
@@ -190,6 +193,7 @@ def doctor() -> None:
 
     try:
         from codeforge.packages.models import ModelManager
+
         mm = ModelManager()
         models = mm.list_models()
         checks.append(("Model registry", "PASS", f"{len(models)} models registered"))
@@ -559,14 +563,14 @@ def serve(host: str, port: int, reload: bool, log_level: str, workers: int) -> N
 
 @main.command()
 @click.argument("query")
-@click.option("--mode", "-m", default="hybrid", help="Search mode: lexical, symbol, semantic, hybrid")
+@click.option("--mode", "-m", default="hybrid", help="Search mode")
 @click.option("--limit", "-l", default=10, help="Maximum results")
-@click.option("--language", default=None, help="Filter by language")
+@click.option("--language", default=None, help="Filter language")
 @click.option("--workspace", "-w", default=None, help="Workspace ID")
 def search(query: str, mode: str, limit: int, language: str | None, workspace: str | None) -> None:
     """Search code in the repository."""
     from codeforge.packages.search.hybrid import HybridSearch
-    from codeforge.packages.search.models import SearchQuery, SearchMode
+    from codeforge.packages.search.models import SearchMode, SearchQuery
 
     hybrid = HybridSearch()
     search_query = SearchQuery(
@@ -587,7 +591,7 @@ def search(query: str, mode: str, limit: int, language: str | None, workspace: s
 
     for r in results:
         table.add_row(
-            r.file_path or "-",
+            r.relative_path or "-",
             r.symbol_name or "-",
             f"{r.score:.3f}",
             r.content[:60] + "..." if len(r.content) > 60 else r.content,
@@ -602,8 +606,8 @@ def search(query: str, mode: str, limit: int, language: str | None, workspace: s
 @click.option("--workspace", "-w", default=None, help="Workspace ID")
 def rag(query: str, top_k: int, workspace: str | None) -> None:
     """Query using RAG (Retrieval-Augmented Generation)."""
-    from codeforge.packages.rag.service import RAGService
     from codeforge.packages.rag.models import RAGQuery
+    from codeforge.packages.rag.service import RAGService
     from codeforge.packages.search.hybrid import HybridSearch
 
     hybrid = HybridSearch()
@@ -643,6 +647,131 @@ def embeddings_status(workspace: str) -> None:
     console.print("  Status: NOT_INDEXED")
     console.print("  Chunks: 0")
     console.print("  Embedded: 0")
+
+
+@main.group()
+def terminal() -> None:
+    """Safe terminal - controlled command execution."""
+
+
+@terminal.command("doctor")
+def terminal_doctor() -> None:
+    """Display terminal subsystem diagnostics (no secrets)."""
+    from codeforge.packages.terminal import TerminalManager
+
+    manager = TerminalManager()
+    info = manager.doctor()
+
+    table = Table(title="CodeForge AI - Terminal Doctor")
+    table.add_column("Property", style="cyan")
+    table.add_column("Value", style="green")
+
+    for key, value in info.items():
+        table.add_row(key, str(value))
+
+    console.print(table)
+
+
+@terminal.command("policy")
+def terminal_policy() -> None:
+    """Display command classification policy."""
+    from codeforge.packages.terminal import CommandPolicy
+
+    data = CommandPolicy().to_dict()
+
+    table = Table(title="CodeForge AI - Terminal Policy")
+    table.add_column("Classification", style="cyan")
+    table.add_column("Commands", style="green")
+
+    table.add_row("BLOCKED (never runs)", ", ".join(data["blocked_commands"]))
+    table.add_row(
+        "DANGEROUS (needs approval)",
+        ", ".join(data["dangerous_commands"]),
+    )
+    table.add_row("RESTRICTED (audited)", ", ".join(data["restricted_commands"]))
+    table.add_row(
+        "SHELL -c (blocked)",
+        ", ".join(data["shell_interpreters"]),
+    )
+    table.add_row("SAFE", str(data["safe_commands"]))
+
+    console.print(table)
+    console.print(
+        f"\n[bold]Timeout:[/bold] default={data['default_timeout']}s max={data['max_timeout']}s"
+    )
+    console.print(
+        f"[bold]Output limit:[/bold] {data['max_output_bytes']} bytes/stream, "
+        f"{data['max_total_output_bytes']} bytes total"
+    )
+    console.print(
+        "[bold]Environment allowlist:[/bold] " + ", ".join(data["environment_allowed_variables"])
+    )
+    console.print(f"[bold]Approval required:[/bold] {data['approval_required']}")
+
+
+@terminal.command("execute")
+@click.argument("command")
+@click.option("--arg", "arguments", multiple=True, help="Argument (repeatable)")
+@click.option("--workspace", "-w", required=True, help="Workspace ID or path")
+@click.option("--cwd", "working_directory", default="", help="Directory in workspace")
+@click.option("--timeout", "-t", type=float, default=None, help="Timeout seconds")
+@click.option("--approved", is_flag=True, help="Approve dangerous command execution")
+def terminal_execute(
+    command: str,
+    arguments: tuple[str, ...],
+    workspace: str,
+    working_directory: str,
+    timeout: float | None,
+    approved: bool,
+) -> None:
+    """Execute COMMAND through the safe terminal policy layer."""
+    import asyncio
+
+    from codeforge.packages.terminal import (
+        CommandRequest,
+        TerminalError,
+        TerminalManager,
+    )
+
+    manager = TerminalManager()
+    request = CommandRequest(
+        command=command,
+        arguments=list(arguments),
+        workspace_id=workspace,
+        working_directory=working_directory,
+        timeout_seconds=timeout or manager.policy.config.default_timeout,
+        approved=approved,
+    )
+
+    try:
+        result = asyncio.run(manager.execute(request))
+    except TerminalError as error:
+        console.print(f"[red]Error:[/red] {error.code}: {error}")
+        sys.exit(1)
+
+    if result.status.value == "waiting_approval":
+        console.print(f"[yellow]Approval required for dangerous command:[/yellow] {command}")
+        console.print("Re-run with --approved to execute.")
+        sys.exit(2)
+
+    label = {
+        "completed": "[green]COMPLETED[/green]",
+        "failed": "[red]FAILED[/red]",
+        "timed_out": "[yellow]TIMED OUT[/yellow]",
+        "cancelled": "[yellow]CANCELLED[/yellow]",
+    }
+    console.print(
+        f"Status: {label.get(result.status.value, result.status.value)}  "
+        f"exit={result.exit_code}  class={result.security_classification.value}  "
+        f"{result.duration_ms:.0f}ms"
+    )
+    if result.stdout:
+        console.print(result.stdout, end="")
+    if result.stderr:
+        console.print(f"[red]{result.stderr}[/red]", end="")
+    if result.truncated:
+        console.print("[yellow](output truncated)[/yellow]")
+    sys.exit(0 if result.success else 1)
 
 
 if __name__ == "__main__":

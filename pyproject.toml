@@ -75,7 +75,7 @@ select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "COM", "C4", "DTZ", "ISC
 ignore = ["COM812", "ISC001", "S110", "S112", "S607", "PTH123"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S108"]
+"tests/**" = ["S101", "S108", "ARG002"]
 "codeforge/cli.py" = ["ARG001"]
 
 [tool.ruff.lint.isort]
@@ -93,7 +93,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["cpuinfo.*", "psutil.*", "torch.*"]
+module = ["cpuinfo.*", "psutil.*", "torch.*", "pynvml", "transformers", "sentencepiece", "safetensors.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

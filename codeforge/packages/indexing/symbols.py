@@ -44,9 +44,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_python(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_python(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         current_class: str = ""
         class_indent = 0
@@ -217,9 +215,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_java(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_java(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -280,9 +276,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_go(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_go(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -336,9 +330,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_rust(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_rust(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -431,9 +423,7 @@ class SymbolExtractor:
                 )
                 continue
 
-            func_match = re.match(
-                r"^(?:static\s+)?(?:inline\s+)?(?:\w+\s+)+(\w+)\s*\(", stripped
-            )
+            func_match = re.match(r"^(?:static\s+)?(?:inline\s+)?(?:\w+\s+)+(\w+)\s*\(", stripped)
             if func_match:
                 name = func_match.group(1)
                 if name not in ("if", "for", "while", "switch", "return"):
@@ -452,9 +442,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_csharp(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_csharp(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -500,9 +488,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_ruby(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_ruby(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -556,9 +542,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_php(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_php(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -579,9 +563,7 @@ class SymbolExtractor:
                 )
                 continue
 
-            method_match = re.match(
-                r"^(?:public|private|protected)\s+function\s+(\w+)", stripped
-            )
+            method_match = re.match(r"^(?:public|private|protected)\s+function\s+(\w+)", stripped)
             if method_match:
                 symbols.append(
                     Symbol(
@@ -598,9 +580,7 @@ class SymbolExtractor:
 
         return symbols
 
-    def _extract_bash(
-        self, lines: list[str], file_id: str, workspace_id: str
-    ) -> list[Symbol]:
+    def _extract_bash(self, lines: list[str], file_id: str, workspace_id: str) -> list[Symbol]:
         symbols: list[Symbol] = []
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -740,8 +720,7 @@ class SymbolExtractor:
             named_match = re.match(r"^export\s+\{([^}]+)\}", stripped)
             if named_match:
                 names = [
-                    n.strip().split(" as ")[0].strip()
-                    for n in named_match.group(1).split(",")
+                    n.strip().split(" as ")[0].strip() for n in named_match.group(1).split(",")
                 ]
                 for name in names:
                     if name:

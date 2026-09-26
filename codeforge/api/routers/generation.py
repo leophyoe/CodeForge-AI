@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -22,6 +22,9 @@ from codeforge.packages.generation.schemas import (
     GenerationConfig,
     GenerationRequest,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 router = APIRouter(tags=["generation"])
 
@@ -89,7 +92,8 @@ async def chat_completion(request: ChatCompletionRequest) -> dict[str, Any] | St
     chat_req = ChatRequest(model_id=request.model, messages=messages, config=config)
 
     if request.stream:
-        async def _event_stream():
+
+        async def _event_stream() -> AsyncIterator[str]:
             try:
                 for event in service.stream_chat(messages, request.model, config):
                     if event.event_type.value == "token":
@@ -102,11 +106,13 @@ async def chat_completion(request: ChatCompletionRequest) -> dict[str, Any] | St
                     if ev.usage is not None:
                         usage_dict = ev.usage.to_dict()
                         break
-                yield _create_sse_event({
-                    "type": "end",
-                    "finish_reason": "stop",
-                    "usage": usage_dict,
-                })
+                yield _create_sse_event(
+                    {
+                        "type": "end",
+                        "finish_reason": "stop",
+                        "usage": usage_dict,
+                    }
+                )
                 yield _create_sse_event("[DONE]")
             except Exception as exc:
                 yield _create_sse_event({"type": "error", "error": str(exc)})
@@ -149,7 +155,8 @@ async def completion(request: CompletionRequest) -> dict[str, Any] | StreamingRe
     gen_req = GenerationRequest(model_id=request.model, prompt=request.prompt, config=config)
 
     if request.stream:
-        async def _event_stream():
+
+        async def _event_stream() -> AsyncIterator[str]:
             try:
                 for event in service.stream_generate(request.prompt, request.model, config):
                     if event.event_type.value == "token":

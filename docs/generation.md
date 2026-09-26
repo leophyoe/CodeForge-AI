@@ -36,6 +36,7 @@ print(response.text)
 
 # Chat
 from codeforge.packages.generation import ChatMessage, ChatRequest
+
 chat_req = ChatRequest(
     messages=[ChatMessage(role="user", content="Hello!")],
     model_id="my-model",
@@ -108,11 +109,7 @@ codeforge chat --model my-model --stream
 
 Each `GenerationResponse` includes `UsageInfo`:
 ```python
-{
-    "prompt_tokens": 10,
-    "completion_tokens": 20,
-    "total_tokens": 30
-}
+{"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
 ```
 
 ## Integration with ModelManager

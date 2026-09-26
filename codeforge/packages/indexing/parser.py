@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .errors import ParseError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass
@@ -28,6 +31,7 @@ class CodeParser:
             raise ParseError(f"Cannot read file: {file_path}: {e}") from e
         if language is None:
             from .languages import detect_language
+
             language = detect_language(file_path)
         return self.parse(source, language)
 

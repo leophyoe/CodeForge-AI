@@ -26,6 +26,7 @@ class APIError(Exception):
         self.message = message
         self.status_code = status_code
         self.request_id = request_id or str(uuid.uuid4())
+        self.request_id_from_caller = request_id is not None
         super().__init__(message)
 
     def to_dict(self) -> dict[str, Any]:
@@ -193,7 +194,7 @@ def _get_request_id_from_scope(request: Request) -> str:
 
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
     """Handle APIError exceptions and return structured JSON response."""
-    if exc.request_id == str(uuid.uuid4()):
+    if not exc.request_id_from_caller:
         exc.request_id = _get_request_id_from_scope(request)
 
     logger.warning(
@@ -206,7 +207,7 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
 
     headers: dict[str, str] = {}
     if exc.status_code == 429 and hasattr(exc, "retry_after"):
-        headers["Retry-After"] = str(int(exc.retry_after))  # type: ignore[attr-defined]
+        headers["Retry-After"] = str(int(exc.retry_after))
 
     return JSONResponse(
         status_code=exc.status_code,

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from ..search.hybrid import HybridSearch
-from ..search.models import SearchQuery
-from .models import RAGQuery
+from typing import TYPE_CHECKING
+
+from codeforge.packages.search.models import SearchQuery
+
+if TYPE_CHECKING:
+    from codeforge.packages.rag.models import RAGQuery
+    from codeforge.packages.search.hybrid import HybridSearch
 
 
 class RAGRetriever:

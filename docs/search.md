@@ -207,11 +207,13 @@ from codeforge.packages.rag import RAGService, RAGQuery
 service = RAGService(hybrid_search)
 service.update_context(chunks, symbols)
 
-response = service.query(RAGQuery(
-    workspace_id="ws1",
-    query="How does authentication work?",
-    top_k=8,
-))
+response = service.query(
+    RAGQuery(
+        workspace_id="ws1",
+        query="How does authentication work?",
+        top_k=8,
+    )
+)
 print(response.answer)
 print(response.sources)
 ```
@@ -243,11 +245,11 @@ context, sources = builder.build_context(search_results)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/v1/search` | Search repository |
-| POST | `/v1/rag/query` | RAG query |
-| POST | `/v1/workspaces/{id}/embeddings/index` | Build embeddings |
-| GET | `/v1/workspaces/{id}/embeddings/status` | Embedding status |
-| POST | `/v1/workspaces/{id}/embeddings/rebuild` | Rebuild embeddings |
-| POST | `/v1/workspaces/{id}/embeddings/cancel` | Cancel embedding |
+| GET | `/v1/search/modes` | List search modes |
+| POST | `/v1/embeddings` | Embed a single text |
+| POST | `/v1/embeddings/batch` | Embed a list of texts |
+| GET | `/v1/embeddings/health` | Embedding pipeline health |
+| GET | `/v1/embeddings/config` | Embedding configuration |
 
 ### Search Request
 
@@ -261,7 +263,9 @@ context, sources = builder.build_context(search_results)
 }
 ```
 
-### RAG Request
+### RAG Query (Python API)
+
+RAG has no HTTP endpoint; it is invoked via `RAGService.query(RAGQuery)`:
 
 ```json
 {

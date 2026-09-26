@@ -39,9 +39,7 @@ class GenerationService:
 
     def __init__(self, model_manager: ModelManager | None = None) -> None:
         self._model_manager = model_manager or ModelManager()
-        self._context_mgr = ContextManager(
-            self._model_manager.get_tokenizer_manager()
-        )
+        self._context_mgr = ContextManager(self._model_manager.get_tokenizer_manager())
 
     @property
     def model_manager(self) -> ModelManager:
@@ -59,10 +57,13 @@ class GenerationService:
         context_len = provider.get_context_length(instance)
         if context_len > 0:
             metadata = self._get_metadata(model_id)
-            has_path = isinstance(metadata, dict) and metadata.get("path")
-            model_path = Path(metadata["path"]) if has_path else None
+            path_value = metadata.get("path") if isinstance(metadata, dict) else None
+            model_path = Path(str(path_value)) if path_value else None
             self._context_mgr.validate_context_length(
-                request.prompt, context_len, model_id, model_path,
+                request.prompt,
+                context_len,
+                model_id,
+                model_path,
             )
 
         result: GenerationResult = provider.generate(

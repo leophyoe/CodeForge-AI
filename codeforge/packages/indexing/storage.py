@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .models import (
     Dependency,
@@ -16,6 +16,9 @@ from .models import (
     SymbolKind,
     Workspace,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class Storage:
@@ -168,8 +171,12 @@ class Storage:
                    (workspace_id, root_path, name, created_at, updated_at, index_status)
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (
-                    ws.workspace_id, ws.root_path, ws.name,
-                    ws.created_at, ws.updated_at, ws.index_status.value,
+                    ws.workspace_id,
+                    ws.root_path,
+                    ws.name,
+                    ws.created_at,
+                    ws.updated_at,
+                    ws.index_status.value,
                 ),
             )
         conn.commit()
@@ -219,9 +226,17 @@ class Storage:
                 content_hash, status, symbol_count, parse_status, is_binary)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                f.file_id, f.workspace_id, f.relative_path, f.language,
-                f.size, f.mtime, f.content_hash, f.status.value,
-                f.symbol_count, f.parse_status, 1 if f.is_binary else 0,
+                f.file_id,
+                f.workspace_id,
+                f.relative_path,
+                f.language,
+                f.size,
+                f.mtime,
+                f.content_hash,
+                f.status.value,
+                f.symbol_count,
+                f.parse_status,
+                1 if f.is_binary else 0,
             ),
         )
         conn.commit()
@@ -234,9 +249,19 @@ class Storage:
                 content_hash, status, symbol_count, parse_status, is_binary)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
-                (f.file_id, f.workspace_id, f.relative_path, f.language,
-                 f.size, f.mtime, f.content_hash, f.status.value,
-                 f.symbol_count, f.parse_status, 1 if f.is_binary else 0)
+                (
+                    f.file_id,
+                    f.workspace_id,
+                    f.relative_path,
+                    f.language,
+                    f.size,
+                    f.mtime,
+                    f.content_hash,
+                    f.status.value,
+                    f.symbol_count,
+                    f.parse_status,
+                    1 if f.is_binary else 0,
+                )
                 for f in files
             ],
         )
@@ -287,9 +312,23 @@ class Storage:
                 parent_symbol_id, visibility, signature, documentation, qualified_name)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
-                (s.symbol_id, s.file_id, s.workspace_id, s.name, s.kind.value,
-                 s.language, s.start_line, s.start_column, s.end_line, s.end_column,
-                 s.parent_symbol_id, s.visibility, s.signature, s.documentation, s.qualified_name)
+                (
+                    s.symbol_id,
+                    s.file_id,
+                    s.workspace_id,
+                    s.name,
+                    s.kind.value,
+                    s.language,
+                    s.start_line,
+                    s.start_column,
+                    s.end_line,
+                    s.end_column,
+                    s.parent_symbol_id,
+                    s.visibility,
+                    s.signature,
+                    s.documentation,
+                    s.qualified_name,
+                )
                 for s in symbols
             ],
         )
@@ -329,8 +368,10 @@ class Storage:
             conditions.append("qualified_name = ?")
             params.append(qualified_name)
         where = " AND ".join(conditions)
+        # `where` contains only internal literals; values use ? placeholders.
         rows = conn.execute(
-            f"SELECT * FROM symbols WHERE {where} ORDER BY name", params
+            f"SELECT * FROM symbols WHERE {where} ORDER BY name",  # noqa: S608
+            params,
         ).fetchall()
         return [self._row_to_symbol(r) for r in rows]
 
@@ -347,8 +388,15 @@ class Storage:
                 imported_names, line)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             [
-                (imp.import_id, imp.file_id, imp.workspace_id, imp.import_path,
-                 imp.import_kind.value, json.dumps(imp.imported_names), imp.line)
+                (
+                    imp.import_id,
+                    imp.file_id,
+                    imp.workspace_id,
+                    imp.import_path,
+                    imp.import_kind.value,
+                    json.dumps(imp.imported_names),
+                    imp.line,
+                )
                 for imp in imports
             ],
         )
@@ -399,8 +447,14 @@ class Storage:
                 import_path, resolved)
                VALUES (?, ?, ?, ?, ?, ?)""",
             [
-                (d.dependency_id, d.source_file_id, d.target_file_id,
-                 d.workspace_id, d.import_path, 1 if d.resolved else 0)
+                (
+                    d.dependency_id,
+                    d.source_file_id,
+                    d.target_file_id,
+                    d.workspace_id,
+                    d.import_path,
+                    1 if d.resolved else 0,
+                )
                 for d in deps
             ],
         )
@@ -434,19 +488,24 @@ class Storage:
                 completed_at, error_message)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                job.job_id, job.workspace_id, job.status.value,
-                job.files_total, job.files_processed, job.files_failed,
-                job.symbols_extracted, job.created_at, job.started_at,
-                job.completed_at, job.error_message,
+                job.job_id,
+                job.workspace_id,
+                job.status.value,
+                job.files_total,
+                job.files_processed,
+                job.files_failed,
+                job.symbols_extracted,
+                job.created_at,
+                job.started_at,
+                job.completed_at,
+                job.error_message,
             ),
         )
         conn.commit()
 
     def get_job(self, job_id: str) -> IndexJob | None:
         conn = self._get_conn()
-        row = conn.execute(
-            "SELECT * FROM index_jobs WHERE job_id = ?", (job_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM index_jobs WHERE job_id = ?", (job_id,)).fetchone()
         if not row:
             return None
         return self._row_to_job(row)

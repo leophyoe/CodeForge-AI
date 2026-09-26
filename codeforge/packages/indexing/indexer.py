@@ -53,9 +53,7 @@ class Indexer:
         self.storage.delete_workspace_files(workspace_id)
         return self.storage.delete_workspace(workspace_id)
 
-    def index_workspace(
-        self, workspace_id: str, background: bool = True
-    ) -> IndexJob:
+    def index_workspace(self, workspace_id: str, background: bool = True) -> IndexJob:
         ws = self.storage.get_workspace(workspace_id)
         if not ws:
             raise IndexingError(f"Workspace not found: {workspace_id}")
@@ -121,9 +119,7 @@ class Indexer:
 
                 self._index_file(file_record, ws.root_path)
                 job.files_processed = i + 1
-                job.symbols_extracted = sum(
-                    f.symbol_count for f in scan_result.files[: i + 1]
-                )
+                job.symbols_extracted = sum(f.symbol_count for f in scan_result.files[: i + 1])
                 if (i + 1) % 50 == 0:
                     self.storage.save_job(job)
 
@@ -215,9 +211,7 @@ class Indexer:
 
         self._build_dependencies(file_record, imports)
 
-    def _build_dependencies(
-        self, file_record: FileRecord, imports: list
-    ) -> None:
+    def _build_dependencies(self, file_record: FileRecord, imports: list) -> None:
         deps: list[Dependency] = []
 
         for imp in imports:
@@ -300,13 +294,15 @@ class Indexer:
             parts = Path(f.relative_path).parts
             for i in range(1, len(parts)):
                 dirs.add(str(Path(*parts[:i])))
-            file_dicts.append({
-                "path": f.relative_path,
-                "language": f.language,
-                "size": f.size,
-                "status": f.status.value,
-                "symbol_count": f.symbol_count,
-            })
+            file_dicts.append(
+                {
+                    "path": f.relative_path,
+                    "language": f.language,
+                    "size": f.size,
+                    "status": f.status.value,
+                    "symbol_count": f.symbol_count,
+                }
+            )
 
         return {
             "workspace_id": workspace_id,

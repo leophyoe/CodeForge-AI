@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import abc
+from typing import TYPE_CHECKING
 
-from .models import SearchResult, VectorRecord
+if TYPE_CHECKING:
+    from .models import SearchResult, VectorRecord
 
 
 class VectorStore(abc.ABC):

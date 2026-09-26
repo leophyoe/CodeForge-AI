@@ -26,6 +26,7 @@ def inspect_safetensors_file(file_path: str | Path) -> SafetensorsInfo:
 
     try:
         import safetensors  # noqa: F401
+
         return _inspect_with_safetensors_lib(path)
     except ImportError:
         return _inspect_with_manual_parsing(path)
@@ -113,11 +114,7 @@ def _inspect_with_manual_parsing(path: Path) -> SafetensorsInfo:
                 shape = info.get("shape", [])
                 data_offsets = info.get("data_offsets", [0, 0])
 
-                size_bytes = (
-                    data_offsets[1] - data_offsets[0]
-                    if len(data_offsets) == 2
-                    else 0
-                )
+                size_bytes = data_offsets[1] - data_offsets[0] if len(data_offsets) == 2 else 0
 
                 total_size += size_bytes
                 tensors.append(

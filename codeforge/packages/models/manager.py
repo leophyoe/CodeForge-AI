@@ -228,6 +228,7 @@ class ModelManager:
             return
         try:
             from codeforge.packages.runtime import MemoryManager
+
             mm = MemoryManager()
             sys_mem = mm.get_system_memory()
             available_gb = sys_mem.available_gb
@@ -242,6 +243,7 @@ class ModelManager:
 
 def _dict_to_metadata(d: dict) -> ModelMetadata:
     from .models import ModelFormat, ModelTask
+
     task_str = d.get("task", "unknown")
     try:
         task = ModelTask(task_str)

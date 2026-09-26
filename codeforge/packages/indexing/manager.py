@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .errors import UnauthorizedWorkspaceError
 from .indexer import Indexer
-from .models import Workspace
 from .storage import Storage
+
+if TYPE_CHECKING:
+    from .models import Dependency, FileRecord, IndexJob, Symbol, SymbolKind, Workspace
 
 
 class WorkspaceManager:
@@ -37,13 +40,17 @@ class WorkspaceManager:
         )
 
     def check_symlink_escape(self, path: Path, root: Path) -> bool:
+        """Return True when path resolves safely inside root (no escape).
+
+        Uses Path.is_relative_to so a sibling directory sharing the root's
+        name prefix (e.g. /tmp/ws-evil vs /tmp/ws) cannot pass as inside.
+        """
         try:
             resolved = path.resolve()
             root_resolved = root.resolve()
-            str(resolved).startswith(str(root_resolved))
-            return True
         except (OSError, ValueError):
             return False
+        return resolved.is_relative_to(root_resolved)
 
     def create_workspace(self, root_path: str, name: str = "") -> Workspace:
         validated = self.validate_workspace_path(root_path)
@@ -58,10 +65,10 @@ class WorkspaceManager:
     def delete_workspace(self, workspace_id: str) -> bool:
         return self.indexer.delete_workspace(workspace_id)
 
-    def index_workspace(self, workspace_id: str, background: bool = True):
+    def index_workspace(self, workspace_id: str, background: bool = True) -> IndexJob:
         return self.indexer.index_workspace(workspace_id, background)
 
-    def refresh_file(self, workspace_id: str, relative_path: str):
+    def refresh_file(self, workspace_id: str, relative_path: str) -> FileRecord | None:
         return self.indexer.refresh_file(workspace_id, relative_path)
 
     def get_project_structure(self, workspace_id: str) -> dict:
@@ -74,22 +81,22 @@ class WorkspaceManager:
         self,
         workspace_id: str,
         name: str | None = None,
-        kind=None,
+        kind: SymbolKind | None = None,
         qualified_name: str | None = None,
-    ):
+    ) -> list[Symbol]:
         return self.indexer.storage.find_symbols(workspace_id, name, kind, qualified_name)
 
-    def find_file(self, workspace_id: str, relative_path: str):
+    def find_file(self, workspace_id: str, relative_path: str) -> FileRecord | None:
         return self.storage.get_file_by_path(workspace_id, relative_path)
 
-    def find_files(self, workspace_id: str, language: str | None = None):
+    def find_files(self, workspace_id: str, language: str | None = None) -> list[FileRecord]:
         files = self.storage.get_workspace_files(workspace_id)
         if language:
             files = [f for f in files if f.language == language]
         return files
 
-    def get_file_symbols(self, file_id: str):
+    def get_file_symbols(self, file_id: str) -> list[Symbol]:
         return self.storage.get_file_symbols(file_id)
 
-    def get_dependencies(self, workspace_id: str):
+    def get_dependencies(self, workspace_id: str) -> list[Dependency]:
         return self.storage.get_workspace_dependencies(workspace_id)

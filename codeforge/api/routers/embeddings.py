@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter(tags=["embeddings"])
@@ -38,13 +38,16 @@ class EmbedBatchResponse(BaseModel):
 
 @router.post("/embeddings", response_model=EmbedResponse)
 async def create_embedding(request: EmbedRequest) -> EmbedResponse:
-    from codeforge.packages.embeddings import EmbeddingManager, EmbeddingConfig
+    from codeforge.packages.embeddings import EmbeddingConfig, EmbeddingManager
     from codeforge.packages.embeddings.cache import EmbeddingCache
 
     config = EmbeddingConfig(model=request.model, normalize=request.normalize)
     manager = EmbeddingManager(config=config, cache=EmbeddingCache())
 
     result = await asyncio.to_thread(manager.embed, request.text)
+
+    if result.embedding is None:
+        raise HTTPException(status_code=500, detail="Embedding provider returned no vector")
 
     return EmbedResponse(
         embedding=result.embedding.vector,
@@ -56,7 +59,7 @@ async def create_embedding(request: EmbedRequest) -> EmbedResponse:
 
 @router.post("/embeddings/batch", response_model=EmbedBatchResponse)
 async def create_embeddings_batch(request: EmbedBatchRequest) -> EmbedBatchResponse:
-    from codeforge.packages.embeddings import EmbeddingManager, EmbeddingConfig
+    from codeforge.packages.embeddings import EmbeddingConfig, EmbeddingManager
     from codeforge.packages.embeddings.cache import EmbeddingCache
 
     config = EmbeddingConfig(model=request.model, normalize=request.normalize)
@@ -64,11 +67,19 @@ async def create_embeddings_batch(request: EmbedBatchRequest) -> EmbedBatchRespo
 
     results = await asyncio.to_thread(manager.embed_batch, request.texts)
 
+    vectors: list[list[float]] = []
+    dimension = 0
+    for r in results:
+        if r.embedding is None:
+            raise HTTPException(status_code=500, detail="Embedding provider returned no vector")
+        vectors.append(r.embedding.vector)
+        dimension = r.embedding.dimension
+
     return EmbedBatchResponse(
-        embeddings=[r.embedding.vector for r in results],
+        embeddings=vectors,
         model=request.model,
-        dimension=results[0].embedding.dimension if results else 0,
-        count=len(results),
+        dimension=dimension,
+        count=len(vectors),
     )
 
 

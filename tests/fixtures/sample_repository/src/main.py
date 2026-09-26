@@ -1,5 +1,5 @@
 """Sample Python module for testing."""
-import os
+
 from typing import Optional
 
 

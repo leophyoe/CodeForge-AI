@@ -115,9 +115,7 @@ def _load_tokenizer_from_path(path: Path) -> object | None:
     try:
         from transformers import AutoTokenizer
 
-        tokenizer: object = AutoTokenizer.from_pretrained(
-            str(path), trust_remote_code=True
-        )
+        tokenizer: object = AutoTokenizer.from_pretrained(str(path), trust_remote_code=True)
         logger.info("Loaded tokenizer from %s using transformers", path)
         return tokenizer
     except Exception as e:

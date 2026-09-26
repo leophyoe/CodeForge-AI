@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import time
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -23,9 +26,23 @@ class LoadModelRequest(BaseModel):
 
 
 @router.get("/models")
-async def list_models() -> list[dict]:
+async def list_models() -> dict[str, Any]:
+    """List models in OpenAI-compatible shape with native metadata merged.
+
+    Single source of truth for GET /v1/models (the OpenAI-compat router used
+    to register a shadowed duplicate of this path).
+    """
     mm = get_model_manager()
-    return mm.list_models()
+    created = int(time.time())
+    data: list[dict[str, Any]] = []
+    for m in mm.list_models():
+        item: dict[str, Any] = dict(m)
+        item.setdefault("id", m.get("model_id", ""))
+        item["object"] = "model"
+        item.setdefault("created", created)
+        item.setdefault("owned_by", "codeforge")
+        data.append(item)
+    return {"object": "list", "data": data}
 
 
 @router.get("/models/{model_id}")

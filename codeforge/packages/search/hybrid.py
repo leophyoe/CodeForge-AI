@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from .lexical import LexicalSearch
-from .models import SearchQuery, SearchResult
-from .semantic import SemanticSearch
 from .symbol import SymbolSearch
+
+if TYPE_CHECKING:
+    from .models import SearchQuery, SearchResult
+    from .semantic import SemanticSearch
 
 
 class HybridSearch:
@@ -57,7 +61,7 @@ class HybridSearch:
         merged = self._merge_results(normalized)
         ranked = self._rank_results(merged)
 
-        return ranked[:query.limit]
+        return ranked[: query.limit]
 
     def _normalize_scores(self, results: list[SearchResult]) -> list[SearchResult]:
         if not results:
@@ -67,7 +71,7 @@ class HybridSearch:
         for r in results:
             by_type.setdefault(r.match_type, []).append(r)
 
-        for match_type, type_results in by_type.items():
+        for _match_type, type_results in by_type.items():
             scores = [r.score for r in type_results]
             if not scores:
                 continue

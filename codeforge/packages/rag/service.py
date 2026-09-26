@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
-from ..search.hybrid import HybridSearch
 from .context import ContextBuilder
 from .models import RAGConfig, RAGQuery, RAGResponse
 from .retriever import RAGRetriever
+
+if TYPE_CHECKING:
+    from codeforge.packages.search.hybrid import HybridSearch
 
 
 class RAGService:
@@ -41,9 +44,7 @@ class RAGService:
         context_text, sources = self.context_builder.build_context(search_results)
         context_time = (time.time() - context_start) * 1000
 
-        messages = self.context_builder.build_prompt(
-            rag_query.query, context_text
-        )
+        messages = self.context_builder.build_prompt(rag_query.query, context_text)
 
         answer = self._generate_answer(messages, rag_query)
 

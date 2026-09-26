@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .models import Embedding, content_hash
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class EmbeddingCache:
@@ -34,12 +37,8 @@ class EmbeddingCache:
             )
             """
         )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_cache_hash ON embedding_cache(text_hash)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_cache_model ON embedding_cache(model_id)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cache_hash ON embedding_cache(text_hash)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_cache_model ON embedding_cache(model_id)")
         conn.commit()
 
     def _make_key(self, text: str, model_id: str) -> str:
@@ -83,9 +82,7 @@ class EmbeddingCache:
     def invalidate(self, text: str, model_id: str) -> bool:
         key = self._make_key(text, model_id)
         conn = self._get_conn()
-        cursor = conn.execute(
-            "DELETE FROM embedding_cache WHERE cache_key = ?", (key,)
-        )
+        cursor = conn.execute("DELETE FROM embedding_cache WHERE cache_key = ?", (key,))
         conn.commit()
         return cursor.rowcount > 0
 

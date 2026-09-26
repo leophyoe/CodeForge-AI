@@ -34,6 +34,7 @@ class DeviceManager:
 
         try:
             import torch  # noqa: F401
+
             self._torch_available = True
         except ImportError:
             logger.info("PyTorch not available, only CPU device detected")
@@ -90,9 +91,7 @@ class DeviceManager:
             result = self.validate_device(preferred)
             if result is not None:
                 return result
-            logger.warning(
-                "Configured device '%s' not available, falling back", preferred
-            )
+            logger.warning("Configured device '%s' not available, falling back", preferred)
 
         # Auto-select: prefer CUDA > MPS > CPU
         for dtype in [DeviceType.CUDA, DeviceType.MPS, DeviceType.CPU]:
@@ -140,8 +139,7 @@ class DeviceManager:
 
         available = self.detect_available_devices()
         available_strs = [
-            f"{d.device_type.value}:{d.device_index}" if d.device_index > 0
-            else d.device_type.value
+            f"{d.device_type.value}:{d.device_index}" if d.device_index > 0 else d.device_type.value
             for d in available
         ]
 
