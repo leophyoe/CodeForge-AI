@@ -34,8 +34,10 @@ async def list_models() -> dict[str, Any]:
     """
     mm = get_model_manager()
     created = int(time.time())
+    from codeforge.packages.models.remote import list_remote_models
+
     data: list[dict[str, Any]] = []
-    for m in mm.list_models():
+    for m in list(mm.list_models()) + list_remote_models():
         item: dict[str, Any] = dict(m)
         item.setdefault("id", m.get("model_id", ""))
         item["object"] = "model"
@@ -48,6 +50,13 @@ async def list_models() -> dict[str, Any]:
 @router.get("/models/{model_id}")
 async def get_model(model_id: str) -> dict:
     model_id = _validate_model_id(model_id)
+    from codeforge.packages.models.remote import is_remote_model, list_remote_models
+
+    if is_remote_model(model_id):
+        for entry in list_remote_models():
+            if entry["model_id"] == model_id:
+                return entry
+        raise HTTPException(status_code=404, detail=f"Model not found: {model_id}")
     mm = get_model_manager()
     try:
         inspection = mm.inspect_model(model_id)

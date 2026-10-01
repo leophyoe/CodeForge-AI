@@ -142,7 +142,7 @@ def _detect_nvidia_torch() -> GPUInfo | None:
 
         name = torch.cuda.get_device_name(0)
         props = torch.cuda.get_device_properties(0)
-        vram_total = props.total_mem / (1024**3)
+        vram_total = props.total_memory / (1024**3)
 
         # Get free memory
         free_mem, total_mem = torch.cuda.mem_get_info(0)
@@ -246,7 +246,7 @@ def _check_torch_cuda() -> bool:
     try:
         import torch
 
-        return torch.cuda.is_available()  # type: ignore[no-any-return]
+        return bool(torch.cuda.is_available())
     except Exception:
         return False
 
@@ -257,7 +257,8 @@ def _get_torch_cuda_version() -> str | None:
         import torch
 
         if torch.cuda.is_available():
-            return torch.version.cuda  # type: ignore[no-any-return]
+            cuda_version: str | None = torch.version.cuda
+            return cuda_version
     except Exception:
         pass
     return None
@@ -269,7 +270,7 @@ def _check_rocm_functional() -> bool:
         import torch
 
         if hasattr(torch, "hip"):
-            return torch.cuda.is_available()  # type: ignore[no-any-return]
+            return bool(torch.cuda.is_available())
     except Exception:
         pass
 

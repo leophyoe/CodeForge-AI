@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeForge AI</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161a21; --panel2: #1c212b; --border: #2a3140;
+    --text: #d7dce5; --muted: #8b93a5; --accent: #4f8cff; --ok: #3fbf6f;
+    --err: #e05555; --warn: #d9a441; --radius: 8px;
+    font-size: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); }
+  .dot.err { background: var(--err); }
+  .badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .badge.ok { color: var(--ok); border-color: var(--ok); }
+  .badge.err { color: var(--err); border-color: var(--err); }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    width: 320px; background: var(--panel); border-right: 1px solid var(--border);
+    padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+  }
+  aside h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 8px;
+  }
+  .card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px; margin-bottom: 10px;
+  }
+  .card .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .card label { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 3px; }
+  input[type=password], input[type=text], input[type=url], select {
+    width: 100%; padding: 7px 9px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; outline: none; font-size: 13px;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  .btn {
+    padding: 7px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); cursor: pointer; font-size: 13px;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { color: var(--err); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row .btn { padding: 5px 10px; font-size: 12px; }
+  section.chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 85%; padding: 10px 13px; border-radius: var(--radius); white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .msg.user { align-self: flex-end; background: #24406e; }
+  .msg.assistant { align-self: flex-start; background: var(--panel2); border: 1px solid var(--border); }
+  .msg.error { align-self: center; background: #3a1d1d; border: 1px solid var(--err); color: #f1b3b3; font-size: 13px; }
+  .meta { font-size: 11px; color: var(--muted); align-self: flex-end; }
+  .composer {
+    display: flex; gap: 8px; padding: 12px 16px;
+    background: var(--panel); border-top: 1px solid var(--border);
+  }
+  .composer input { flex: 1; }
+  #status { font-size: 12px; color: var(--muted); }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>CodeForge AI</h1>
+  <span class="badge" id="health-badge">checking…</span>
+  <span class="badge" id="model-badge">no model</span>
+  <span style="flex:1"></span>
+  <span id="status"></span>
+  <a class="badge" href="/docs" target="_blank" rel="noopener">API docs</a>
+</header>
+<main>
+  <aside>
+    <div>
+      <h2>Provider API Keys</h2>
+      <div id="providers"></div>
+      <p class="hint">Keys are saved to <code>.env</code> on the server
+        (mode 600) and never returned in full. Remote models
+        (<code>openai:…</code> / <code>gemini:…</code>) appear in the model
+        list once a key is set.</p>
+    </div>
+    <div>
+      <h2>Server access (optional)</h2>
+      <div class="card">
+        <label>X-API-Key (when server auth is enabled)</label>
+        <input type="password" id="server-key" placeholder="leave empty if auth disabled">
+      </div>
+    </div>
+    <div>
+      <h2>Model</h2>
+      <div class="card">
+        <label>Active model</label>
+        <select id="model-select"></select>
+        <div class="row" style="margin:10px 0 0">
+          <button class="btn primary" id="load-btn">Load</button>
+          <button class="btn" id="unload-btn">Unload</button>
+          <button class="btn" id="refresh-btn">Refresh</button>
+        </div>
+        <div class="row" style="margin:8px 0 0">
+          <span class="hint" id="model-status"></span>
+        </div>
+      </div>
+      <p class="hint">Local models need an explicit Load. Remote models
+        auto-load on first chat.</p>
+    </div>
+  </aside>
+
+  <section class="chat">
+    <div id="messages">
+      <div class="msg assistant">Set an API key on the left (or use a local model),
+then pick a model and start chatting.</div>
+    </div>
+    <div class="composer">
+      <input id="prompt" type="text" placeholder="Ask something… (Enter to send)"
+             autocomplete="off">
+      <button class="btn primary" id="send-btn">Send</button>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const history = [];
+
+function serverKey() { return localStorage.getItem("cf_server_key") || ""; }
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({"Content-Type": "application/json"}, opts.headers || {});
+  const key = serverKey();
+  if (key) headers["X-API-Key"] = key;
+  const res = await fetch(path, Object.assign({}, opts, {headers}));
+  let body = null;
+  try { body = await res.json(); } catch (_) { /* non-JSON */ }
+  if (!res.ok) {
+    const detail = body && body.detail ? JSON.stringify(body.detail) : res.statusText;
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  return body;
+}
+
+function setStatus(text) { $("status").textContent = text || ""; }
+
+function addMessage(cls, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.textContent = text;
+  $("messages").appendChild(div);
+  div.scrollIntoView({block: "end"});
+  return div;
+}
+
+async function refreshHealth() {
+  try {
+    const h = await api("/v1/health");
+    $("health-badge").textContent = "v" + (h.version || "?");
+    $("health-badge").className = "badge ok";
+  } catch (e) {
+    $("health-badge").textContent = "offline";
+    $("health-badge").className = "badge err";
+  }
+}
+
+async function refreshProviders() {
+  const data = await api("/v1/settings/providers");
+  const box = $("providers");
+  box.innerHTML = "";
+  for (const p of data.providers) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="row">
+        <strong style="text-transform:capitalize">${p.provider}</strong>
+        <span class="badge ${p.configured ? "ok" : ""}">
+          ${p.configured ? "key set · " + p.key_masked : "no key"}
+        </span>
+      </div>
+      <label>API key</label>
+      <input type="password" id="key-${p.provider}"
+             placeholder="${p.configured ? "enter new key to replace" : "sk-… / AIza…"}">
+      <label>Base URL</label>
+      <input type="url" id="base-${p.provider}" value="${p.base_url}">
+      <div class="row" style="margin:10px 0 0">
+        <button class="btn primary" data-act="save" data-p="${p.provider}">Save</button>
+        <button class="btn danger" data-act="clear" data-p="${p.provider}"
+                ${p.configured ? "" : "disabled"}>Clear key</button>
+      </div>`;
+    box.appendChild(card);
+  }
+  box.querySelectorAll("button[data-act]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const p = btn.dataset.p;
+      if (btn.dataset.act === "save") saveProvider(p);
+      else clearProvider(p);
+    });
+  });
+}
+
+async function saveProvider(name) {
+  const key = $("key-" + name).value.trim();
+  const base = $("base-" + name).value.trim();
+  const body = {provider: name};
+  if (key) body.api_key = key;
+  if (base) body.base_url = base;
+  if (!key && !base) { setStatus("nothing to save for " + name); return; }
+  setStatus("saving " + name + "…");
+  try {
+    await api("/v1/settings/providers", {method: "PUT", body: JSON.stringify(body)});
+    setStatus(name + " saved");
+    await Promise.all([refreshProviders(), refreshModels()]);
+  } catch (e) { setStatus("save failed: " + e.message); }
+}
+
+async function clearProvider(name) {
+  if (!confirm("Remove the " + name + " API key from .env?")) return;
+  try {
+    await api("/v1/settings/providers", {
+      method: "PUT", body: JSON.stringify({provider: name, clear: true}),
+    });
+    setStatus(name + " key cleared");
+    await Promise.all([refreshProviders(), refreshModels()]);
+  } catch (e) { setStatus("clear failed: " + e.message); }
+}
+
+let models = [];
+
+async function refreshModels() {
+  const data = await api("/v1/models");
+  models = data.data || [];
+  const sel = $("model-select");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  for (const m of models) {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    const remote = m.source === "remote" ? " ☁" : "";
+    opt.textContent = `${m.id} (${m.status})${remote}`;
+    sel.appendChild(opt);
+  }
+  if (prev && models.some((m) => m.id === prev)) sel.value = prev;
+  updateModelBadge();
+}
+
+function currentModel() { return $("model-select").value || ""; }
+
+function updateModelBadge() {
+  const m = models.find((x) => x.id === currentModel());
+  if (!m) { $("model-badge").textContent = "no model"; $("model-badge").className = "badge"; return; }
+  $("model-badge").textContent = m.id + " · " + m.status;
+  $("model-badge").className = "badge " + (m.status === "loaded" ? "ok" : "");
+  $("model-status").textContent = `${m.provider} · ${m.format} · ctx ${m.context_length}`;
+}
+
+async function loadModel() {
+  const id = currentModel(); if (!id) return;
+  setStatus("loading " + id + "…");
+  try {
+    await api(`/v1/models/${encodeURIComponent(id)}/load`, {method: "POST", body: "{}"});
+    setStatus(id + " loaded"); await refreshModels();
+  } catch (e) { setStatus("load failed: " + e.message); }
+}
+
+async function unloadModel() {
+  const id = currentModel(); if (!id) return;
+  setStatus("unloading " + id + "…");
+  try {
+    await api(`/v1/models/${encodeURIComponent(id)}/unload`, {method: "POST", body: "{}"});
+    setStatus(id + " unloaded"); await refreshModels();
+  } catch (e) { setStatus("unload failed: " + e.message); }
+}
+
+async function send() {
+  const text = $("prompt").value.trim();
+  const model = currentModel();
+  if (!text || !model) return;
+  $("prompt").value = "";
+  history.push({role: "user", content: text});
+  addMessage("user", text);
+  const thinking = addMessage("assistant", "…");
+  $("send-btn").disabled = true;
+  try {
+    const res = await api("/v1/chat", {
+      method: "POST",
+      body: JSON.stringify({model, messages: history, max_new_tokens: 256}),
+    });
+    thinking.remove();
+    history.push({role: "assistant", content: res.text || ""});
+    if (res.finish_reason === "error") {
+      const err = (res.usage && res.usage.error) || "generation failed";
+      addMessage("error", err);
+      history.pop();
+    } else {
+      addMessage("assistant", res.text || "(empty)");
+      const u = res.usage || {};
+      addMessage("meta", `${res.finish_reason} · prompt ${u.prompt_tokens} / completion ${u.completion_tokens}`);
+    }
+    await refreshModels();
+  } catch (e) {
+    thinking.remove();
+    history.pop();
+    addMessage("error", e.message);
+  } finally {
+    $("send-btn").disabled = false;
+    $("prompt").focus();
+  }
+}
+
+$("send-btn").addEventListener("click", send);
+$("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+$("load-btn").addEventListener("click", loadModel);
+$("unload-btn").addEventListener("click", unloadModel);
+$("refresh-btn").addEventListener("click", () => refreshModels().catch(() => {}));
+$("model-select").addEventListener("change", updateModelBadge);
+$("server-key").addEventListener("input", (e) => {
+  const v = e.target.value.trim();
+  if (v) localStorage.setItem("cf_server_key", v);
+  else localStorage.removeItem("cf_server_key");
+});
+
+(async function init() {
+  $("server-key").value = serverKey();
+  await refreshHealth();
+  try { await refreshProviders(); } catch (e) { setStatus("settings: " + e.message); }
+  try { await refreshModels(); } catch (e) { setStatus("models: " + e.message); }
+})();
+</script>
+</body>
+</html>

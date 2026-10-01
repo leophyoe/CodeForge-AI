@@ -68,6 +68,9 @@ tmp/
 temp/
 *.tmp
 
+# VS Code extension build artifacts
+*.vsix
+
 # Model weights (large files)
 *.safetensors
 *.pth

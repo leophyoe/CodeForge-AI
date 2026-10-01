@@ -221,9 +221,10 @@ def model() -> None:
 def models() -> None:
     """List all registered models (alias for 'model list')."""
     from codeforge.packages.models import ModelManager
+    from codeforge.packages.models.remote import list_remote_models
 
     mm = ModelManager()
-    model_list = mm.list_models()
+    model_list = mm.list_models() + list_remote_models()
 
     if not model_list:
         console.print("[yellow]No models registered.[/yellow]")
@@ -255,9 +256,10 @@ def models() -> None:
 def model_list_cmd() -> None:
     """List all registered models."""
     from codeforge.packages.models import ModelManager
+    from codeforge.packages.models.remote import list_remote_models
 
     mm = ModelManager()
-    model_list = mm.list_models()
+    model_list = mm.list_models() + list_remote_models()
 
     if not model_list:
         console.print("[yellow]No models registered.[/yellow]")
@@ -282,6 +284,46 @@ def model_list_cmd() -> None:
         )
 
     console.print(table)
+
+
+@model.command("providers")
+def model_providers_cmd() -> None:
+    """Show configured model providers (local + remote API keys)."""
+    from codeforge.packages.models.remote import get_remote_settings
+
+    settings = get_remote_settings()
+    table = Table(title="Providers")
+    table.add_column("Provider", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Detail")
+
+    table.add_row("local (pytorch)", "ready", "Models via 'codeforge model list'")
+    openai_key = settings.openai_key()
+    table.add_row(
+        "openai",
+        "configured" if openai_key else "no key",
+        (
+            f"{len(settings.openai_models)} models available"
+            if openai_key
+            else "set OPENAI_API_KEY to enable"
+        ),
+    )
+    gemini_key = settings.gemini_key()
+    table.add_row(
+        "gemini",
+        "configured" if gemini_key else "no key",
+        (
+            f"{len(settings.gemini_models)} models available"
+            if gemini_key
+            else "set GEMINI_API_KEY to enable"
+        ),
+    )
+    console.print(table)
+    if openai_key or gemini_key:
+        console.print(
+            "[dim]Use 'codeforge chat -m openai:gpt-4o-mini' or "
+            "'gemini:gemini-2.5-flash' to switch providers.[/dim]"
+        )
 
 
 @model.command("inspect")
@@ -429,6 +471,13 @@ def generate(
     from codeforge.packages.models import ModelManager
 
     mm = ModelManager()
+    if model not in mm.get_loaded_models():
+        console.print(f"[dim]Loading {model}...[/dim]")
+        try:
+            mm.load_model(model)
+        except Exception as e:
+            console.print(f"[red]Failed to load model:[/red] {e}")
+            return
     svc = GenerationService(model_manager=mm)
 
     config = GenerationConfig(
@@ -479,6 +528,13 @@ def chat(model: str, max_tokens: int, temperature: float, stream: bool) -> None:
     from codeforge.packages.models import ModelManager
 
     mm = ModelManager()
+    if model not in mm.get_loaded_models():
+        console.print(f"[dim]Loading {model}...[/dim]")
+        try:
+            mm.load_model(model)
+        except Exception as e:
+            console.print(f"[red]Failed to load model:[/red] {e}")
+            return
     svc = GenerationService(model_manager=mm)
     config = GenerationConfig(max_tokens=max_tokens, temperature=temperature)
 
@@ -772,6 +828,151 @@ def terminal_execute(
     if result.truncated:
         console.print("[yellow](output truncated)[/yellow]")
     sys.exit(0 if result.success else 1)
+
+
+@main.group()
+def file() -> None:
+    """File editing - safe workspace edits (Phase 10)."""
+
+
+@main.command()
+@click.argument("task")
+@click.option("--model", "-m", required=True, help="Model ID to run the agent with")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--max-steps", default=10, show_default=True, help="Loop step budget")
+@click.option("--max-tokens", "-n", default=512, show_default=True, help="Tokens per LLM turn")
+@click.option("--temperature", "-t", default=0.2, help="Sampling temperature")
+@click.option("--allow", "allowed", multiple=True, help="Restrict to tool (repeatable)")
+def agent(
+    task: str,
+    model: str,
+    workspace: str,
+    max_steps: int,
+    max_tokens: int,
+    temperature: float,
+    allowed: tuple[str, ...],
+) -> None:
+    """Run an autonomous agent task (Phase 11)."""
+    import asyncio
+
+    from codeforge.packages.agent import AgentConfig, AgentEngine, GenerationLLM
+    from codeforge.packages.generation import GenerationService
+    from codeforge.packages.models import ModelManager
+    from codeforge.packages.tools.builtins import build_tool_manager
+
+    mm = ModelManager()
+    if model not in mm.get_loaded_models():
+        console.print(f"[dim]Loading {model}...[/dim]")
+        try:
+            mm.load_model(model)
+        except Exception as e:
+            console.print(f"[red]Failed to load model:[/red] {e}")
+            sys.exit(1)
+
+    config = AgentConfig(
+        model_id=model,
+        workspace_id=workspace,
+        max_steps=max_steps,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        allowed_tools=list(allowed) if allowed else None,
+    )
+    engine = AgentEngine(
+        llm=GenerationLLM(GenerationService(model_manager=mm)),
+        tool_manager=build_tool_manager(),
+    )
+
+    console.print(f"[bold]Agent task:[/bold] {task}")
+    result = asyncio.run(engine.run(task, config))
+
+    for step in result.steps:
+        if step.kind == "llm":
+            preview = step.text[:80].replace("\n", " ")
+            status = "[red]ERROR[/red]" if step.error else "[cyan]llm[/cyan]"
+            console.print(f"  {status} {preview}{'...' if len(step.text) >= 80 else ''}")
+        else:
+            mark = "[green]ok[/green]" if step.success else "[red]fail[/red]"
+            args = ", ".join(f"{k}={v}" for k, v in list(step.arguments.items())[:3])
+            console.print(f"  {mark} {step.tool_name}({args})")
+
+    label = {
+        "completed": "[green]COMPLETED[/green]",
+        "failed": "[red]FAILED[/red]",
+        "max_steps": "[yellow]MAX STEPS[/yellow]",
+        "cancelled": "[yellow]CANCELLED[/yellow]",
+    }
+    console.print(
+        f"\nStatus: {label.get(result.status.value, result.status.value)}  "
+        f"steps={len(result.steps)} llm={result.llm_calls} tools={result.tool_calls}  "
+        f"{result.duration_s:.1f}s"
+    )
+    if result.error:
+        console.print(f"[red]Error:[/red] {result.error}")
+    if result.final_text:
+        console.print(f"\n[bold]Final answer:[/bold]\n{result.final_text}")
+    sys.exit(0 if result.status.value == "completed" else 1)
+
+
+@file.command("read")
+@click.argument("path")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+def file_read(path: str, workspace: str) -> None:
+    """Read a workspace file."""
+    from codeforge.packages.file_editing import get_file_edit_manager
+
+    result = get_file_edit_manager().read(workspace, path)
+    if not result.success:
+        console.print(f"[red]{result.error_code}:[/red] {result.error}")
+        sys.exit(1)
+    console.print(result.content, end="")
+
+
+@file.command("write")
+@click.argument("path")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--content", "-c", default=None, help="Content (stdin if omitted)")
+@click.option("--create-only", is_flag=True, help="Fail if the file exists")
+def file_write(path: str, workspace: str, content: str | None, create_only: bool) -> None:
+    """Create or overwrite a workspace file (atomic)."""
+    from codeforge.packages.file_editing import get_file_edit_manager
+
+    if content is None:
+        content = sys.stdin.read()
+    result = get_file_edit_manager().write(workspace, path, content, create_only=create_only)
+    if not result.success:
+        console.print(f"[red]{result.error_code}:[/red] {result.error}")
+        sys.exit(1)
+    console.print(
+        f"[green]wrote[/green] {result.path} ({result.bytes_written} bytes, "
+        f"{result.lines_after} lines)"
+    )
+    if result.diff:
+        console.print(result.diff, end="")
+
+
+@file.command("edit")
+@click.argument("path")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--old", required=True, help="Exact text to find")
+@click.option("--new", required=True, help="Replacement text")
+@click.option("--all", "replace_all", is_flag=True, help="Replace every occurrence")
+def file_edit(
+    path: str,
+    workspace: str,
+    old: str,
+    new: str,
+    replace_all: bool,
+) -> None:
+    """Replace exact text in a workspace file."""
+    from codeforge.packages.file_editing import get_file_edit_manager
+
+    result = get_file_edit_manager().str_replace(workspace, path, old, new, replace_all=replace_all)
+    if not result.success:
+        console.print(f"[red]{result.error_code}:[/red] {result.error}")
+        sys.exit(1)
+    console.print(f"[green]edited[/green] {result.path} ({result.replacements} replacement(s))")
+    if result.diff:
+        console.print(result.diff, end="")
 
 
 if __name__ == "__main__":

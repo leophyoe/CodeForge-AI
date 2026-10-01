@@ -16,6 +16,12 @@ from .errors import (
 from .models import ModelInspection, ModelMetadata, ModelStatus
 from .provider import LocalPyTorchProvider, ModelProvider
 from .registry import ModelRegistry
+from .remote.catalog import (
+    get_remote_provider,
+    is_remote_model,
+    remote_metadata,
+    split_model_id,
+)
 from .tokenizer import TokenizerManager
 
 logger = logging.getLogger(__name__)
@@ -147,6 +153,9 @@ class ModelManager:
         force: bool = False,
     ) -> dict:
         """Load a model into memory."""
+        if is_remote_model(model_id):
+            return self._load_remote_model(model_id, force=force)
+
         if self._cache.contains(model_id) and not force:
             raise ModelAlreadyLoadedError(model_id)
 
@@ -173,15 +182,39 @@ class ModelManager:
             self._registry.update_status(model_id, ModelStatus.FAILED)
             raise
 
+    def _load_remote_model(self, model_id: str, force: bool = False) -> dict:
+        """Load a remote (openai:/gemini:) model: validate credentials."""
+        if self._cache.contains(model_id) and not force:
+            raise ModelAlreadyLoadedError(model_id)
+
+        split = split_model_id(model_id)
+        if split is None:
+            raise ModelNotFoundError(model_id)
+        prefix, name = split
+        metadata = remote_metadata(prefix, name)
+        provider = get_remote_provider(prefix)
+
+        self._statuses[model_id] = ModelStatus.LOADING
+        try:
+            instance = provider.load_model(metadata, "auto", "auto")
+            self._cache.add(model_id, instance)
+            self._statuses[model_id] = ModelStatus.LOADED
+            info = provider.get_model_info(instance)
+            return {"model_id": model_id, "status": "loaded", **info}
+        except Exception:
+            self._statuses[model_id] = ModelStatus.FAILED
+            raise
+
     def unload_model(self, model_id: str) -> dict:
         """Unload a model from memory."""
         instance = self._cache.get(model_id)
         if instance is None:
             raise ModelNotFoundError(model_id)
 
+        provider = self.get_provider_for_model(model_id)
         self._statuses[model_id] = ModelStatus.UNLOADING
         try:
-            self._provider.unload_model(instance)
+            provider.unload_model(instance)
             self._cache.remove(model_id)
             entry = self._registry.get(model_id)
             if entry is not None:
@@ -200,6 +233,13 @@ class ModelManager:
         return self._statuses.get(model_id, ModelStatus.DISCOVERED)
 
     def get_provider(self) -> ModelProvider:
+        return self._provider
+
+    def get_provider_for_model(self, model_id: str) -> ModelProvider:
+        """Return the provider that owns model_id (local or remote)."""
+        split = split_model_id(model_id)
+        if split is not None:
+            return get_remote_provider(split[0])
         return self._provider
 
     def get_registry(self) -> ModelRegistry:

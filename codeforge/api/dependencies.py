@@ -44,7 +44,7 @@ def get_generation_service() -> Any:
     if "generation_service" not in _singletons:
         from codeforge.packages.generation.service import GenerationService
 
-        _singletons["generation_service"] = GenerationService()
+        _singletons["generation_service"] = GenerationService(model_manager=get_model_manager())
     return _singletons["generation_service"]
 
 

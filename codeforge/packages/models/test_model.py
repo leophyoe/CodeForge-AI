@@ -89,8 +89,24 @@ def _create_test_tokenizer(output_path: Path) -> None:
         "bos_token": "token_0",
         "eos_token": "token_1",
     }
+
     with open(output_path / "special_tokens_map.json", "w") as f:
         json.dump(special_tokens_map, f, indent=2)
+
+    tokenizer_json: dict[str, Any] = {
+        "version": "1.0",
+        "truncation": None,
+        "padding": None,
+        "added_tokens": [],
+        "normalizer": None,
+        "pre_tokenizer": {"type": "Whitespace"},
+        "post_processor": None,
+        "decoder": None,
+        "model": {"type": "WordLevel", "vocab": vocab, "unk_token": "token_0"},
+    }
+
+    with open(output_path / "tokenizer.json", "w") as f:
+        json.dump(tokenizer_json, f, indent=2)
 
 
 class TinyTransformer:
@@ -115,9 +131,7 @@ class TinyTransformer:
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         self.position_embedding = nn.Embedding(max_seq_len, hidden_size)
 
-        self.layers = nn.ModuleList()
-        for _ in range(num_layers):
-            self.layers.append(TransformerBlock(hidden_size, num_heads))
+        self.layers = [TransformerBlock(hidden_size, num_heads) for _ in range(num_layers)]
 
         self.lm_head = nn.Linear(hidden_size, vocab_size, bias=False)
         self.lm_head.weight = self.embedding.weight
@@ -216,6 +230,16 @@ class TransformerBlock:
         x = self.norm1(x + attn_out)
         ff_out = self.ff(x)
         return self.norm2(x + ff_out)
+
+    def __call__(self, x: Any) -> Any:
+        return self.forward(x)
+
+    def parameters(self) -> Any:
+        params = list(self.attention.parameters())
+        params += list(self.norm1.parameters())
+        params += list(self.norm2.parameters())
+        params += list(self.ff.parameters())
+        return iter(params)
 
     def state_dict(self) -> dict[str, Any]:
         """Get state dict."""

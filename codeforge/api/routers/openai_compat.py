@@ -137,6 +137,10 @@ async def _stream_chat_response(
     )
 
     for event in service.stream_chat(messages, model_id, config):
+        if event.event_type.value == "error":
+            yield _sse_chat_chunk(chunk_id, model_id, created, {}, "error")
+            yield "data: [DONE]\n\n"
+            return
         if event.text:
             yield _sse_chat_chunk(
                 chunk_id,
@@ -166,6 +170,10 @@ async def _stream_completion_response(
     )
 
     for event in service.stream_generate(prompt_text, model_id, config):
+        if event.event_type.value == "error":
+            yield _sse_completion_chunk(chunk_id, model_id, created, "", "error")
+            yield "data: [DONE]\n\n"
+            return
         if event.text:
             yield _sse_completion_chunk(
                 chunk_id,

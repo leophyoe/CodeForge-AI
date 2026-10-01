@@ -35,6 +35,7 @@ def inspect_safetensors_file(file_path: str | Path) -> SafetensorsInfo:
 def _inspect_with_safetensors_lib(path: Path) -> SafetensorsInfo:
     """Inspect using the safetensors library."""
     import safetensors
+    import safetensors.torch
 
     try:
         header = safetensors.torch.load_file(str(path), device="cpu")

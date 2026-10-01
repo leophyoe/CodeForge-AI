@@ -106,13 +106,17 @@ class UsageInfo:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    error: str = ""
 
     def to_dict(self) -> dict:
-        return {
+        d: dict = {
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
         }
+        if self.error:
+            d["error"] = self.error
+        return d
 
 
 @dataclass

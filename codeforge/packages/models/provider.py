@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -211,9 +212,31 @@ class LocalPyTorchProvider(ModelProvider):
         top_p: float = 0.9,
     ) -> Any:
         result = self.generate(model_instance, prompt, max_tokens, temperature, top_p)
-        for char in result.text:
-            yield StreamToken(text=char, is_end=False)
-        yield StreamToken(text="", is_end=True)
+        if result.finish_reason == "error":
+            yield StreamToken(
+                text="",
+                is_end=True,
+                error=str(result.usage.get("error", "generation failed")),
+            )
+            return
+
+        prompt_tokens = int(result.usage.get("prompt_tokens", 0))
+        tokenizer = self._get_tokenizer_from_model(model_instance)
+        generated_ids: list[int] = []
+        previous_text = ""
+        for token_id in result.tokens:
+            generated_ids.append(token_id)
+            piece = ""
+            if tokenizer is not None:
+                full_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+                piece = (
+                    full_text[len(previous_text) :]
+                    if full_text.startswith(previous_text)
+                    else full_text
+                )
+                previous_text = full_text
+            yield StreamToken(text=piece, token_id=token_id, is_end=False)
+        yield StreamToken(text="", is_end=True, prompt_tokens=prompt_tokens)
 
     def chat(
         self,
@@ -340,9 +363,20 @@ class LocalPyTorchProvider(ModelProvider):
         dtype: str,
     ) -> Any:
         try:
-            hf_files = ["config.json", "pytorch_model.bin", "model.safetensors"]
-            has_hf = any((path / f).exists() for f in hf_files)
-            if has_hf:
+            config_path = path / "config.json"
+            if config_path.exists():
+                config = json.loads(config_path.read_text(encoding="utf-8"))
+                architectures = [str(a) for a in (config.get("architectures") or [])]
+                if config.get("model_type") == "tiny_transformer" or any(
+                    a.startswith("TinyTransformer") for a in architectures
+                ):
+                    model = self._load_tiny_transformer(path, config, device, dtype)
+                    if model is not None:
+                        return model
+                else:
+                    return self._load_huggingface_model(path, device, dtype)
+
+            if any((path / f).exists() for f in ("pytorch_model.bin", "model.safetensors")):
                 return self._load_huggingface_model(path, device, dtype)
 
             pt_files = list(path.glob("*.pt")) + list(path.glob("*.pth"))
@@ -369,12 +403,75 @@ class LocalPyTorchProvider(ModelProvider):
                 device_map=device if device != "cpu" else None,
                 trust_remote_code=True,
             )
-            if device == "cpu":
-                model = model.to("cpu")
             model.eval()
+            self._attach_tokenizer(model, path)
             return model
         except Exception as e:
             logger.debug("HuggingFace loading failed: %s", e)
+        return None
+
+    def _attach_tokenizer(self, model: Any, path: Path) -> None:
+        try:
+            from transformers import AutoTokenizer
+
+            model.tokenizer = AutoTokenizer.from_pretrained(
+                str(path),
+                trust_remote_code=True,
+            )
+        except Exception as e:
+            logger.warning("Tokenizer loading failed for %s: %s", path, e)
+
+    def _load_tiny_transformer(
+        self,
+        path: Path,
+        config: dict[str, Any],
+        device: str,
+        dtype: str,
+    ) -> Any:
+        try:
+            import torch
+
+            from .test_model import TinyTransformer
+
+            checkpoint = path / "pytorch_model.bin"
+            if not checkpoint.exists():
+                return None
+
+            model = TinyTransformer(
+                vocab_size=int(config.get("vocab_size", 256)),
+                hidden_size=int(config.get("hidden_size", 32)),
+                num_layers=int(config.get("num_hidden_layers", 2)),
+                num_heads=int(config.get("num_attention_heads", 2)),
+                max_seq_len=int(config.get("max_position_embeddings", 128)),
+            )
+            state = torch.load(str(checkpoint), map_location="cpu", weights_only=True)
+            if not isinstance(state, dict):
+                return None
+
+            for key, value in state.items():
+                parts = str(key).split(".")
+                target: Any = model
+                for part in parts[:-1]:
+                    target = target[int(part)] if part.isdigit() else getattr(target, part)
+                param = getattr(target, parts[-1])
+                if isinstance(param, torch.nn.Parameter):
+                    param.data.copy_(value)
+                else:
+                    setattr(target, parts[-1], value)
+
+            torch_dtype = _str_to_torch_dtype(dtype)
+            params = list(model.parameters())
+            for p in params:
+                p.data = p.data.to(dtype=torch_dtype)
+            if device != "cpu":
+                for p in params:
+                    p.data = p.data.to(device)
+
+            model.eval()
+            self._attach_tokenizer(model, path)
+            return model
+        except Exception as e:
+            logger.debug("Tiny transformer loading failed: %s", e)
         return None
 
     def _load_pytorch_checkpoint(

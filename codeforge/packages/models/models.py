@@ -26,6 +26,7 @@ class ModelFormat(str, Enum):
     PYTORCH_BIN = "pytorch_bin"
     PYTORCH_CHECKPOINT = "pytorch_checkpoint"
     HUGGINGFACE = "huggingface"
+    API = "api"
     UNKNOWN = "unknown"
 
 
@@ -164,3 +165,5 @@ class StreamToken:
     text: str = ""
     token_id: int = 0
     is_end: bool = False
+    prompt_tokens: int = 0
+    error: str = ""

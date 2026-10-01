@@ -84,7 +84,31 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     application.add_exception_handler(Exception, unhandled_exception_handler)
 
     _register_routers(application)
+    _mount_web_ui(application)
     return application
+
+
+def _mount_web_ui(app: FastAPI) -> None:
+    """Serve the built-in web UI at /ui (index at /)."""
+    from pathlib import Path
+
+    from fastapi.responses import RedirectResponse
+    from fastapi.staticfiles import StaticFiles
+
+    static_dir = Path(__file__).resolve().parent / "static"
+    if not static_dir.is_dir():
+        logger.warning("Web UI static directory missing: %s", static_dir)
+        return
+
+    app.mount(
+        "/ui",
+        StaticFiles(directory=str(static_dir), html=True),
+        name="web-ui",
+    )
+
+    @app.get("/", include_in_schema=False)
+    async def _root() -> RedirectResponse:
+        return RedirectResponse(url="/ui/")
 
 
 def _register_routers(app: FastAPI) -> None:
@@ -92,7 +116,9 @@ def _register_routers(app: FastAPI) -> None:
 
     from codeforge.api.dependencies import verify_api_key
     from codeforge.api.routers import (
+        agent,
         embeddings,
+        files,
         generation,
         hardware,
         health,
@@ -100,6 +126,7 @@ def _register_routers(app: FastAPI) -> None:
         openai_compat,
         runtime,
         search,
+        settings,
         terminal,
         tools,
         workspaces,
@@ -112,6 +139,9 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(runtime.router, prefix="/v1", dependencies=auth)
     app.include_router(models.router, prefix="/v1", dependencies=auth)
     app.include_router(generation.router, prefix="/v1", dependencies=auth)
+    app.include_router(settings.router, prefix="/v1", dependencies=auth)
+    app.include_router(files.router, prefix="/v1", dependencies=auth)
+    app.include_router(agent.router, prefix="/v1", dependencies=auth)
     app.include_router(embeddings.router, prefix="/v1", dependencies=auth)
     app.include_router(openai_compat.router, prefix="/v1", dependencies=auth)
     app.include_router(search.router, prefix="/v1", dependencies=auth)

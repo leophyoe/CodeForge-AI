@@ -134,7 +134,7 @@ def _enumerate_devices(
 
             for i in range(torch.cuda.device_count()):
                 props = torch.cuda.get_device_properties(i)
-                total_mem = props.total_mem / (1024**3)
+                total_mem = props.total_memory / (1024**3)
                 name = props.name
                 if isinstance(name, bytes):
                     name = name.decode("utf-8")

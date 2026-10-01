@@ -57,6 +57,14 @@ class TokenStreamer:
                     is_end = False
 
                 if is_end:
+                    if stream_token.prompt_tokens:
+                        metrics.prompt_tokens = stream_token.prompt_tokens
+                    if stream_token.error:
+                        yield StreamEvent(
+                            event_type=StreamEventType.ERROR,
+                            error=stream_token.error,
+                        )
+                        return
                     break
 
                 collected_text += text

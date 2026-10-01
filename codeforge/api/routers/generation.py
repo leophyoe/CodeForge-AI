@@ -95,17 +95,15 @@ async def chat_completion(request: ChatCompletionRequest) -> dict[str, Any] | St
 
         async def _event_stream() -> AsyncIterator[str]:
             try:
+                usage_dict: dict[str, Any] = {}
                 for event in service.stream_chat(messages, request.model, config):
                     if event.event_type.value == "token":
                         yield _create_sse_event({"type": "token", "text": event.text})
                     elif event.event_type.value == "error":
                         yield _create_sse_event({"type": "error", "error": event.error})
                         return
-                usage_dict = {}
-                for ev in reversed(list(service.stream_chat(messages, request.model, config))):
-                    if ev.usage is not None:
-                        usage_dict = ev.usage.to_dict()
-                        break
+                    if event.usage is not None:
+                        usage_dict = event.usage.to_dict()
                 yield _create_sse_event(
                     {
                         "type": "end",
@@ -158,13 +156,18 @@ async def completion(request: CompletionRequest) -> dict[str, Any] | StreamingRe
 
         async def _event_stream() -> AsyncIterator[str]:
             try:
+                usage_dict: dict[str, Any] = {}
                 for event in service.stream_generate(request.prompt, request.model, config):
                     if event.event_type.value == "token":
                         yield _create_sse_event({"type": "token", "text": event.text})
                     elif event.event_type.value == "error":
                         yield _create_sse_event({"type": "error", "error": event.error})
                         return
-                yield _create_sse_event({"type": "end", "finish_reason": "stop", "usage": {}})
+                    if event.usage is not None:
+                        usage_dict = event.usage.to_dict()
+                yield _create_sse_event(
+                    {"type": "end", "finish_reason": "stop", "usage": usage_dict}
+                )
                 yield _create_sse_event("[DONE]")
             except Exception as exc:
                 yield _create_sse_event({"type": "error", "error": str(exc)})

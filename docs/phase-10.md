@@ -1,5 +1,7 @@
 # Phase 10 — Safe Terminal (Complete)
 
+> File editing half: see [file-editing.md](file-editing.md).
+
 Phase 10 delivers controlled, policy-gated command execution. It was ~60%
 complete at audit time (see [phase-10-audit.md](phase-10-audit.md)); this
 phase completes the package, API, CLI, tests, audit, and documentation.
