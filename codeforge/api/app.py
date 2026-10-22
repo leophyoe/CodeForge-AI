@@ -122,6 +122,7 @@ def _register_routers(app: FastAPI) -> None:
         generation,
         hardware,
         health,
+        ide,
         models,
         openai_compat,
         runtime,
@@ -145,6 +146,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(embeddings.router, prefix="/v1", dependencies=auth)
     app.include_router(openai_compat.router, prefix="/v1", dependencies=auth)
     app.include_router(search.router, prefix="/v1", dependencies=auth)
+    app.include_router(ide.router, prefix="/v1", dependencies=auth)
     app.include_router(tools.router, prefix="/v1", dependencies=auth)
     app.include_router(terminal.router, dependencies=auth)
     app.include_router(workspaces.router, dependencies=auth)

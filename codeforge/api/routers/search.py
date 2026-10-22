@@ -39,6 +39,7 @@ class SearchResponse(BaseModel):
 
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest) -> SearchResponse:
+    from codeforge.api.routers.workspaces import get_manager
     from codeforge.packages.search.hybrid import HybridSearch
     from codeforge.packages.search.models import SearchMode, SearchQuery
 
@@ -54,7 +55,16 @@ async def search(request: SearchRequest) -> SearchResponse:
         symbol=request.symbol,
     )
 
-    results = await asyncio.to_thread(hybrid_search.search, search_query, chunks=[], symbols=[])
+    if request.workspace_id:
+        manager = get_manager()
+        chunks = manager.get_workspace_chunks(request.workspace_id)
+        symbols = [s.to_dict() for s in manager.find_symbols(request.workspace_id)]
+    else:
+        chunks, symbols = [], []
+
+    results = await asyncio.to_thread(
+        hybrid_search.search, search_query, chunks=chunks, symbols=symbols
+    )
 
     return SearchResponse(
         results=[

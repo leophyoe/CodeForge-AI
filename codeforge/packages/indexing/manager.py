@@ -98,5 +98,8 @@ class WorkspaceManager:
     def get_file_symbols(self, file_id: str) -> list[Symbol]:
         return self.storage.get_file_symbols(file_id)
 
+    def get_workspace_chunks(self, workspace_id: str) -> list[dict]:
+        return self.storage.get_workspace_chunks(workspace_id)
+
     def get_dependencies(self, workspace_id: str) -> list[Dependency]:
         return self.storage.get_workspace_dependencies(workspace_id)

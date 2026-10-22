@@ -697,3 +697,48 @@ class TestSearchMappingRegression:
         assert len(items) == 1
         assert items[0]["file_path"] == "src/app.py"
         assert items[0]["symbol_name"] == "main"
+
+
+# ── Search persistence (A0) ────────────────────────────────────────────────
+
+
+class TestSearchPersistenceRegression:
+    def test_search_returns_persisted_chunks(self, tmp_path, monkeypatch) -> None:
+        from codeforge.api.routers import workspaces as workspaces_router
+        from codeforge.packages.indexing.manager import WorkspaceManager
+        from codeforge.packages.indexing.storage import Storage
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "app.py").write_text(
+            "def calculate_total(items):\n    return sum(items)\n", encoding="utf-8"
+        )
+
+        manager = WorkspaceManager(Storage(str(tmp_path / "search.db")))
+        ws = manager.create_workspace(str(repo), "t")
+        manager.index_workspace(ws.workspace_id, background=False)
+
+        monkeypatch.setattr(workspaces_router, "_manager", manager)
+
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post(
+            "/v1/search",
+            json={
+                "workspace_id": ws.workspace_id,
+                "query": "calculate_total",
+                "mode": "lexical",
+            },
+        )
+        assert response.status_code == 200
+        results = response.json()["results"]
+        assert results, "/v1/search must return persisted chunks"
+        assert results[0]["file_path"] == "app.py"
+
+    def test_search_unknown_workspace_returns_empty(self) -> None:
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+        response = client.post(
+            "/v1/search",
+            json={"workspace_id": "does-not-exist", "query": "anything", "mode": "lexical"},
+        )
+        assert response.status_code == 200
+        assert response.json()["results"] == []

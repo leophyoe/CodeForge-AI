@@ -4,6 +4,8 @@ import threading
 import time
 from pathlib import Path
 
+from codeforge.packages.chunks import CodeChunker
+
 from .errors import IndexingError
 from .languages import is_source_language
 from .models import (
@@ -27,6 +29,7 @@ class Indexer:
         self.scanner = FileScanner()
         self.parser = CodeParser()
         self.extractor = SymbolExtractor()
+        self.chunker = CodeChunker()
         self._active_jobs: dict[str, threading.Event] = {}
 
     def create_workspace(self, root_path: str, name: str = "") -> Workspace:
@@ -149,6 +152,8 @@ class Indexer:
         existing = self.storage.get_file_by_path(
             file_record.workspace_id, file_record.relative_path
         )
+        if existing:
+            file_record.file_id = existing.file_id
 
         if existing and existing.content_hash == file_record.content_hash:
             file_record.status = FileStatus.INDEXED
@@ -195,6 +200,7 @@ class Indexer:
             self.storage.delete_file_imports(existing.file_id)
             self.storage.delete_file_exports(existing.file_id)
             self.storage.delete_file_dependencies(existing.file_id)
+            self.storage.delete_file_chunks(existing.file_id)
 
         file_record.symbol_count = len(symbols)
         file_record.status = FileStatus.INDEXED
@@ -209,7 +215,29 @@ class Indexer:
                 exp["export_id"] = f"{file_record.file_id}_{exp['export_name']}"
             self.storage.save_exports(exports)
 
+        self._save_chunks(file_record, source, language, symbols)
+
         self._build_dependencies(file_record, imports)
+
+    def _save_chunks(
+        self,
+        file_record: FileRecord,
+        source: bytes,
+        language: str,
+        symbols: list,
+    ) -> None:
+        text = source.decode("utf-8", errors="replace")
+        symbol_dicts = [s.to_dict() for s in symbols] or None
+        chunks = self.chunker.chunk_file(
+            text,
+            language,
+            relative_path=file_record.relative_path,
+            file_id=file_record.file_id,
+            workspace_id=file_record.workspace_id,
+            symbols=symbol_dicts,
+        )
+        if chunks:
+            self.storage.save_chunks(chunks)
 
     def _build_dependencies(self, file_record: FileRecord, imports: list) -> None:
         deps: list[Dependency] = []

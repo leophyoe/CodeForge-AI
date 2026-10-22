@@ -1,8 +1,10 @@
 import shutil
+import time
 from pathlib import Path
 
 import pytest
 
+from codeforge.packages.chunks import CodeChunk
 from codeforge.packages.indexing.errors import (
     ScannerError,
     UnauthorizedWorkspaceError,
@@ -515,6 +517,26 @@ class TestIndexer:
         assert job.status == JobStatus.COMPLETED
         assert job.files_processed > 0
 
+    def test_background_index_job_completes(self, indexer, tmp_path):
+        # Regression: the worker thread used to die on sqlite thread affinity,
+        # leaving the job stuck in QUEUED and the workspace unindexed.
+        root = tmp_path / "bg_repo"
+        root.mkdir()
+        (root / "beta.py").write_text("def beta():\n    return 7\n", encoding="utf-8")
+
+        ws = indexer.create_workspace(str(root), "bg")
+        job = indexer.index_workspace(ws.workspace_id, background=True)
+
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            job = indexer.get_job(job.job_id)
+            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+                break
+            time.sleep(0.05)
+
+        assert job.status == JobStatus.COMPLETED, job.error_message
+        assert indexer.storage.count_chunks(ws.workspace_id) >= 1
+
     def test_get_project_structure(self, indexer, tmp_workspace):
         ws = indexer.create_workspace(str(tmp_workspace), "test")
         indexer.index_workspace(ws.workspace_id, background=False)
@@ -567,6 +589,114 @@ class TestWorkspaceManager:
         manager.index_workspace(ws.workspace_id, background=False)
         deps = manager.get_dependencies(ws.workspace_id)
         assert isinstance(deps, list)
+
+
+class TestChunkPersistence:
+    """A0: chunk rows must be persisted so `/v1/search` can return them."""
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "alpha.py").write_text("def alpha_one():\n    return 1\n", encoding="utf-8")
+        return root
+
+    def test_chunks_persisted_after_index(self, indexer, repo):
+        ws = indexer.create_workspace(str(repo), "t")
+        job = indexer.index_workspace(ws.workspace_id, background=False)
+        assert job.status == JobStatus.COMPLETED
+
+        chunks = indexer.storage.get_workspace_chunks(ws.workspace_id)
+        assert chunks, "indexing must persist chunk rows"
+        chunk = chunks[0]
+        assert chunk["relative_path"] == "alpha.py"
+        assert chunk["workspace_id"] == ws.workspace_id
+        assert "alpha_one" in chunk["content"]
+        assert chunk["start_line"] >= 0
+        assert chunk["end_line"] >= chunk["start_line"]
+        assert isinstance(chunk["metadata"], dict)
+
+    def test_unchanged_reindex_keeps_chunks(self, indexer, repo):
+        ws = indexer.create_workspace(str(repo), "t")
+        indexer.index_workspace(ws.workspace_id, background=False)
+        before = indexer.storage.get_workspace_chunks(ws.workspace_id)
+        assert before
+
+        indexer.index_workspace(ws.workspace_id, background=False)
+        after = indexer.storage.get_workspace_chunks(ws.workspace_id)
+        assert after == before
+
+    def test_changed_file_refreshes_chunks(self, indexer, repo):
+        ws = indexer.create_workspace(str(repo), "t")
+        indexer.index_workspace(ws.workspace_id, background=False)
+        first = indexer.storage.get_workspace_chunks(ws.workspace_id)
+        assert any("alpha_one" in c["content"] for c in first)
+
+        (repo / "alpha.py").write_text("def alpha_two():\n    return 2\n", encoding="utf-8")
+        indexer.index_workspace(ws.workspace_id, background=False)
+
+        chunks = indexer.storage.get_workspace_chunks(ws.workspace_id)
+        joined = "\n".join(c["content"] for c in chunks)
+        assert "alpha_two" in joined
+        assert "alpha_one" not in joined
+
+    def test_reindex_does_not_duplicate_file_rows(self, indexer, repo):
+        ws = indexer.create_workspace(str(repo), "t")
+        indexer.index_workspace(ws.workspace_id, background=False)
+        rows = len(indexer.storage.get_workspace_files(ws.workspace_id))
+
+        indexer.index_workspace(ws.workspace_id, background=False)
+        (repo / "alpha.py").write_text("def alpha_two():\n    return 2\n", encoding="utf-8")
+        indexer.index_workspace(ws.workspace_id, background=False)
+
+        assert len(indexer.storage.get_workspace_files(ws.workspace_id)) == rows
+
+    def test_delete_file_chunks(self, indexer, repo):
+        ws = indexer.create_workspace(str(repo), "t")
+        indexer.index_workspace(ws.workspace_id, background=False)
+        file_id = indexer.storage.get_workspace_chunks(ws.workspace_id)[0]["file_id"]
+
+        indexer.storage.delete_file_chunks(file_id)
+        remaining = [
+            c
+            for c in indexer.storage.get_workspace_chunks(ws.workspace_id)
+            if c["file_id"] == file_id
+        ]
+        assert remaining == []
+
+    def test_delete_workspace_cascades_chunks(self, indexer, repo):
+        ws = indexer.create_workspace(str(repo), "t")
+        indexer.index_workspace(ws.workspace_id, background=False)
+        assert indexer.storage.get_workspace_chunks(ws.workspace_id)
+
+        indexer.delete_workspace(ws.workspace_id)
+        assert indexer.storage.get_workspace_chunks(ws.workspace_id) == []
+
+    def test_chunk_metadata_roundtrip(self, storage):
+        ws = Workspace(root_path="/repo", name="repo")
+        storage.save_workspace(ws)
+        record = FileRecord(
+            workspace_id=ws.workspace_id, relative_path="a.py", language="python"
+        )
+        storage.save_file(record)
+
+        storage.save_chunks(
+            [
+                CodeChunk(
+                    workspace_id=ws.workspace_id,
+                    file_id=record.file_id,
+                    relative_path="a.py",
+                    language="python",
+                    content="x = 1",
+                    metadata={"tokens": 1, "kind": "value"},
+                )
+            ]
+        )
+
+        chunks = storage.get_workspace_chunks(ws.workspace_id)
+        assert len(chunks) == 1
+        assert chunks[0]["content"] == "x = 1"
+        assert chunks[0]["metadata"] == {"tokens": 1, "kind": "value"}
 
 
 class TestSecurity:

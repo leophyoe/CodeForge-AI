@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from typing import TYPE_CHECKING
 
 from .models import (
@@ -20,20 +21,27 @@ from .models import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from codeforge.packages.chunks import CodeChunk
+
 
 class Storage:
     def __init__(self, db_path: str | Path = "codeforge_index.db") -> None:
         self.db_path = str(db_path)
-        self._conn: sqlite3.Connection | None = None
+        # One connection per thread: indexing runs on background threads while
+        # the API serves requests on others, and sqlite3 connections are
+        # bound to the thread that created them.
+        self._local = threading.local()
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
-        if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path)
-            self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA foreign_keys=ON")
-        return self._conn
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            self._local.conn = conn
+        return conn
 
     def _init_db(self) -> None:
         conn = self._get_conn()
@@ -149,6 +157,31 @@ class Storage:
                 error_message TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (workspace_id) REFERENCES workspaces(workspace_id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS chunks (
+                chunk_id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                file_id TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                language TEXT NOT NULL DEFAULT '',
+                symbol_id TEXT NOT NULL DEFAULT '',
+                symbol_name TEXT NOT NULL DEFAULT '',
+                qualified_name TEXT NOT NULL DEFAULT '',
+                parent_symbol TEXT NOT NULL DEFAULT '',
+                start_line INTEGER NOT NULL DEFAULT 0,
+                end_line INTEGER NOT NULL DEFAULT 0,
+                content TEXT NOT NULL DEFAULT '',
+                content_hash TEXT NOT NULL DEFAULT '',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                FOREIGN KEY (file_id) REFERENCES files(file_id) ON DELETE CASCADE,
+                FOREIGN KEY (workspace_id) REFERENCES workspaces(workspace_id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chunks_workspace ON chunks(workspace_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_path ON chunks(relative_path);
+            CREATE INDEX IF NOT EXISTS idx_chunks_symbol ON chunks(symbol_name);
+            CREATE INDEX IF NOT EXISTS idx_chunks_language ON chunks(language);
             """
         )
         conn.commit()
@@ -221,10 +254,21 @@ class Storage:
     def save_file(self, f: FileRecord) -> None:
         conn = self._get_conn()
         conn.execute(
-            """INSERT OR REPLACE INTO files
+            """INSERT INTO files
                (file_id, workspace_id, relative_path, language, size, mtime,
                 content_hash, status, symbol_count, parse_status, is_binary)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(file_id) DO UPDATE SET
+                   workspace_id = excluded.workspace_id,
+                   relative_path = excluded.relative_path,
+                   language = excluded.language,
+                   size = excluded.size,
+                   mtime = excluded.mtime,
+                   content_hash = excluded.content_hash,
+                   status = excluded.status,
+                   symbol_count = excluded.symbol_count,
+                   parse_status = excluded.parse_status,
+                   is_binary = excluded.is_binary""",
             (
                 f.file_id,
                 f.workspace_id,
@@ -244,10 +288,21 @@ class Storage:
     def save_files(self, files: list[FileRecord]) -> None:
         conn = self._get_conn()
         conn.executemany(
-            """INSERT OR REPLACE INTO files
+            """INSERT INTO files
                (file_id, workspace_id, relative_path, language, size, mtime,
                 content_hash, status, symbol_count, parse_status, is_binary)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(file_id) DO UPDATE SET
+                   workspace_id = excluded.workspace_id,
+                   relative_path = excluded.relative_path,
+                   language = excluded.language,
+                   size = excluded.size,
+                   mtime = excluded.mtime,
+                   content_hash = excluded.content_hash,
+                   status = excluded.status,
+                   symbol_count = excluded.symbol_count,
+                   parse_status = excluded.parse_status,
+                   is_binary = excluded.is_binary""",
             [
                 (
                     f.file_id,
@@ -277,7 +332,8 @@ class Storage:
     def get_file_by_path(self, workspace_id: str, relative_path: str) -> FileRecord | None:
         conn = self._get_conn()
         row = conn.execute(
-            "SELECT * FROM files WHERE workspace_id = ? AND relative_path = ?",
+            """SELECT * FROM files WHERE workspace_id = ? AND relative_path = ?
+               ORDER BY rowid DESC""",
             (workspace_id, relative_path),
         ).fetchone()
         if not row:
@@ -479,6 +535,87 @@ class Storage:
         conn.execute("DELETE FROM dependencies WHERE source_file_id = ?", (file_id,))
         conn.commit()
 
+    def save_chunks(self, chunks: list[CodeChunk]) -> None:
+        conn = self._get_conn()
+        conn.executemany(
+            """INSERT OR REPLACE INTO chunks
+               (chunk_id, workspace_id, file_id, relative_path, language,
+                symbol_id, symbol_name, qualified_name, parent_symbol,
+                start_line, end_line, content, content_hash, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (
+                    c.chunk_id,
+                    c.workspace_id,
+                    c.file_id,
+                    c.relative_path,
+                    c.language,
+                    c.symbol_id,
+                    c.symbol_name,
+                    c.qualified_name,
+                    c.parent_symbol,
+                    c.start_line,
+                    c.end_line,
+                    c.content,
+                    c.content_hash,
+                    json.dumps(c.metadata),
+                )
+                for c in chunks
+            ],
+        )
+        conn.commit()
+
+    def get_workspace_chunks(self, workspace_id: str) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM chunks WHERE workspace_id = ? ORDER BY relative_path, start_line",
+            (workspace_id,),
+        ).fetchall()
+        return [self._row_to_chunk(r) for r in rows]
+
+    def get_file_chunks(self, file_id: str) -> list[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM chunks WHERE file_id = ? ORDER BY start_line",
+            (file_id,),
+        ).fetchall()
+        return [self._row_to_chunk(r) for r in rows]
+
+    def delete_file_chunks(self, file_id: str) -> None:
+        conn = self._get_conn()
+        conn.execute("DELETE FROM chunks WHERE file_id = ?", (file_id,))
+        conn.commit()
+
+    def delete_workspace_chunks(self, workspace_id: str) -> None:
+        conn = self._get_conn()
+        conn.execute("DELETE FROM chunks WHERE workspace_id = ?", (workspace_id,))
+        conn.commit()
+
+    def count_chunks(self, workspace_id: str) -> int:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT COUNT(*) FROM chunks WHERE workspace_id = ?", (workspace_id,)
+        ).fetchone()
+        return int(row[0]) if row else 0
+
+    def _row_to_chunk(self, row: sqlite3.Row) -> dict:
+        return {
+            "chunk_id": row["chunk_id"],
+            "workspace_id": row["workspace_id"],
+            "file_id": row["file_id"],
+            "relative_path": row["relative_path"],
+            "language": row["language"],
+            "symbol_id": row["symbol_id"],
+            "symbol_name": row["symbol_name"],
+            "qualified_name": row["qualified_name"],
+            "parent_symbol": row["parent_symbol"],
+            "start_line": row["start_line"],
+            "end_line": row["end_line"],
+            "content": row["content"],
+            "content_hash": row["content_hash"],
+            "metadata": json.loads(row["metadata"] or "{}"),
+        }
+
     def save_job(self, job: IndexJob) -> None:
         conn = self._get_conn()
         conn.execute(
@@ -529,6 +666,9 @@ class Storage:
         import_count = conn.execute(
             "SELECT COUNT(*) FROM imports WHERE workspace_id = ?", (workspace_id,)
         ).fetchone()[0]
+        chunk_count = conn.execute(
+            "SELECT COUNT(*) FROM chunks WHERE workspace_id = ?", (workspace_id,)
+        ).fetchone()[0]
         lang_rows = conn.execute(
             "SELECT language, COUNT(*) as cnt FROM files WHERE workspace_id = ? GROUP BY language",
             (workspace_id,),
@@ -538,6 +678,7 @@ class Storage:
             "file_count": file_count,
             "symbol_count": symbol_count,
             "import_count": import_count,
+            "chunk_count": chunk_count,
             "languages": languages,
         }
 
@@ -614,6 +755,7 @@ class Storage:
         )
 
     def close(self) -> None:
-        if self._conn:
-            self._conn.close()
-            self._conn = None
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            conn.close()
+            self._local.conn = None
